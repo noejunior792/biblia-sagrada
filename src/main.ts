@@ -358,37 +358,51 @@ app.whenReady().then(async () => {
 async function registerIpcHandlers() {
   console.log('🔧 Registrando handlers IPC...');
   console.log('Inicializando serviço híbrido da Bíblia...');
-  const bibliaService = await initBibliaService();
-  console.log('✅ Serviço da Bíblia inicializado, registrando handlers...');
+  
+  let bibliaService;
+  try {
+    bibliaService = await initBibliaService();
+    console.log('✅ Serviço da Bíblia inicializado, registrando handlers...');
+  } catch (error) {
+    console.error('❌ Erro crítico ao inicializar serviço da Bíblia:', error);
+    console.log('🔄 Tentando recuperação do serviço...');
+    
+    // Tentar recuperação básica
+    try {
+      const { getBibliaService } = await import('./database/biblia-service');
+      bibliaService = getBibliaService();
+      console.log('⚠️ Usando serviço sem inicialização completa');
+    } catch (recoveryError) {
+      console.error('💥 Falha na recuperação do serviço:', recoveryError);
+      throw new Error('Não foi possível inicializar o serviço da Bíblia');
+    }
+  }
 
   // Livros
   ipcMain.handle('get-livros', async () => {
     try {
       console.log('📚 Handler get-livros chamado');
-      console.log('📚 bibliaService disponível?', !!bibliaService);
-      console.log('📚 bibliaService.getLivros é função?', typeof bibliaService.getLivros);
+      
+      if (!bibliaService) {
+        console.error('📚 Serviço da Bíblia não disponível');
+        return { success: false, error: 'Serviço não inicializado', data: null };
+      }
 
       const result = await bibliaService.getLivros();
-      console.log('📚 Result get-livros completo:', JSON.stringify(result, null, 2));
       console.log('📚 Result success:', result.success);
       console.log('📚 Result data length:', result.data?.length);
-      console.log('📚 Result error:', result.error);
 
       // Sempre retornar estrutura completa DatabaseResponse
       if (result.success && result.data) {
         const response = { success: true, data: result.data };
-        console.log('📚 Retornando resposta de sucesso:', response);
         return response;
       } else {
         const response = { success: false, error: result.error || 'Erro desconhecido', data: null };
-        console.log('📚 Retornando resposta de erro:', response);
         return response;
       }
     } catch (error) {
       console.error('📚 Erro crítico ao buscar livros:', error);
-      console.error('📚 Stack trace:', error instanceof Error ? error.stack : 'N/A');
       const response = { success: false, error: (error as Error).message, data: null };
-      console.log('📚 Retornando resposta de exceção:', response);
       return response;
     }
   });
@@ -407,30 +421,27 @@ async function registerIpcHandlers() {
   ipcMain.handle('get-versiculos-capitulo', async (_, livroId: number, capitulo: number) => {
     try {
       console.log('📖 Handler get-versiculos-capitulo chamado com:', { livroId, capitulo });
-      console.log('📖 bibliaService disponível?', !!bibliaService);
-      console.log('📖 bibliaService.getVersiculosCapitulo é função?', typeof bibliaService.getVersiculosCapitulo);
+      
+      if (!bibliaService) {
+        console.error('📖 Serviço da Bíblia não disponível');
+        return { success: false, error: 'Serviço não inicializado', data: null };
+      }
 
       const result = await bibliaService.getVersiculosCapitulo(livroId, capitulo);
-      console.log('📖 Result get-versiculos-capitulo completo:', JSON.stringify(result, null, 2));
       console.log('📖 Result success:', result.success);
       console.log('📖 Result data length:', result.data?.length);
-      console.log('📖 Result error:', result.error);
 
       // Sempre retornar estrutura completa DatabaseResponse
       if (result.success && result.data) {
         const response = { success: true, data: result.data };
-        console.log('📖 Retornando resposta de sucesso:', response);
         return response;
       } else {
         const response = { success: false, error: result.error || 'Erro desconhecido ao carregar versículos', data: null };
-        console.log('📖 Retornando resposta de erro:', response);
         return response;
       }
     } catch (error) {
       console.error('📖 Erro crítico ao buscar versículos:', error);
-      console.error('📖 Stack trace:', error instanceof Error ? error.stack : 'N/A');
       const response = { success: false, error: (error as Error).message, data: null };
-      console.log('📖 Retornando resposta de exceção:', response);
       return response;
     }
   });
@@ -572,6 +583,11 @@ async function registerIpcHandlers() {
   // Versículo do dia
   ipcMain.handle('get-versiculo-dia', async () => {
     try {
+      if (!bibliaService) {
+        console.error('Serviço da Bíblia não disponível para versículo do dia');
+        return { success: false, error: 'Serviço não inicializado' };
+      }
+      
       const result = await bibliaService.getVersiculoDia();
       return result.success ? result.data : { success: false, error: result.error };
     } catch (error) {

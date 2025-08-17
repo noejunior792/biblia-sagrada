@@ -4,13 +4,13 @@
   "version": "1.0.0",
   "description": "Aplicativo completo da Bíblia Sagrada King James em Português com recursos de estudo, favoritos, anotações e busca avançada",
   "main": ".vite/build/main.js",
-  "homepage": "https://github.com/bibliasagrada/app",
+  "homepage": "https://github.com/noejunior792/bibliasagrada",
   "repository": {
     "type": "git",
-    "url": "https://github.com/bibliasagrada/app.git"
+    "url": "https://github.com/noejunior792/bibliasagrada.git"
   },
   "bugs": {
-    "url": "https://github.com/bibliasagrada/app/issues"
+    "url": "https://github.com/noejunior792/bibliasagrada/issues"
   },
   "scripts": {
     "start": "electron-forge start -- --no-sandbox",
@@ -54,13 +54,13 @@
   ],
   "author": {
     "name": "Equipe Bíblia Sagrada",
-    "email": "contato@bibliasagrada.com",
-    "url": "https://github.com/bibliasagrada"
+    "email": "bibliasagrada@noejunior.me",
+    "url": "https://github.com/noejunior792/bibliasagrada"
   },
   "contributors": [
     {
       "name": "noejunior299",
-      "email": "noejunior299@example.com"
+      "email": "noedombaxe@gmail.com"
     }
   ],
   "license": "MIT",

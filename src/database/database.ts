@@ -20,10 +20,31 @@ export class BibliaDatabase {
           reject(err);
         } else {
           console.log('Banco de dados SQLite conectado');
-          this.createTables().then(resolve).catch(reject);
+          // Configure database for better performance and concurrency
+          this.configureDatabase()
+            .then(() => this.createTables())
+            .then(resolve)
+            .catch(reject);
         }
       });
     });
+  }
+
+  private async configureDatabase(): Promise<void> {
+    if (!this.db) {
+      throw new Error('Database não inicializado');
+    }
+
+    // Enable WAL mode for better concurrency
+    await this.run('PRAGMA journal_mode = WAL');
+    // Set synchronous mode to NORMAL for better performance
+    await this.run('PRAGMA synchronous = NORMAL');
+    // Set busy timeout to 30 seconds
+    await this.run('PRAGMA busy_timeout = 30000');
+    // Enable foreign keys
+    await this.run('PRAGMA foreign_keys = ON');
+    
+    console.log('✅ Configurações do banco aplicadas');
   }
 
   private async createTables(): Promise<void> {
@@ -191,13 +212,21 @@ export class BibliaDatabase {
         return;
       }
       
-      this.db.close((err) => {
+      // Close WAL mode properly before closing database
+      this.db.run('PRAGMA wal_checkpoint(TRUNCATE)', (err) => {
         if (err) {
-          reject(err);
-        } else {
-          console.log('Conexão com banco de dados fechada');
-          resolve();
+          console.warn('Aviso ao fazer checkpoint WAL:', err);
         }
+        
+        this.db!.close((closeErr) => {
+          if (closeErr) {
+            reject(closeErr);
+          } else {
+            console.log('Conexão com banco de dados fechada');
+            this.db = null;
+            resolve();
+          }
+        });
       });
     });
   }

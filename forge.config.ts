@@ -54,8 +54,8 @@ const config: ForgeConfig = {
         categories: ['Education'],
         mimeType: ['application/x-biblia-bookmark'],
         icon: './assets/icon.png',
-        homepage: 'https://github.com/bibliasagrada/app',
-        maintainer: 'Bíblia Sagrada <contato@bibliasagrada.com>',
+        homepage: 'https://github.com/noejunior792/bibliasagrada',
+        maintainer: 'Bíblia Sagrada <bibliasagrada@noejunior.me>',
         bin: 'biblia-sagrada',
 
       }
@@ -69,7 +69,7 @@ const config: ForgeConfig = {
         version: '1.0.0',
 
         license: 'MIT',
-        homepage: 'https://github.com/bibliasagrada/app',
+        homepage: 'https://github.com/noejunior792/bibliasagrada',
         categories: ['Education'],
         requires: ['nss', 'atk', 'at-spi2-atk', 'libdrm', 'libxkbcommon', 'libXcomposite', 'libXdamage', 'libXrandr', 'mesa-libgbm', 'libXScrnSaver', 'alsa-lib']
       }
