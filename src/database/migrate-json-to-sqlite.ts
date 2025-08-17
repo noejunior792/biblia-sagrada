@@ -140,13 +140,31 @@ class JSONToSQLiteMigrator {
     console.log('🧹 Limpando dados existentes...');
     
     // Limpar na ordem correta devido às foreign keys
-    await this.db.run('DELETE FROM versiculos_fts');
+    // Para tabela FTS5, não podemos usar DELETE diretamente
+    try {
+      await this.db.run('DROP TABLE IF EXISTS versiculos_fts');
+    } catch (error) {
+      console.log('⚠️ Aviso ao remover tabela FTS:', error);
+    }
+    
     await this.db.run('DELETE FROM historico_leitura');
     await this.db.run('DELETE FROM anotacoes');
     await this.db.run('DELETE FROM favoritos');
     await this.db.run('DELETE FROM versiculos');
     await this.db.run('DELETE FROM capitulos');
     await this.db.run('DELETE FROM livros');
+    
+    // Recriar tabela FTS5
+    await this.db.run(`
+      CREATE VIRTUAL TABLE IF NOT EXISTS versiculos_fts USING fts5(
+        livro_nome,
+        capitulo,
+        numero,
+        texto,
+        content='versiculos',
+        content_rowid='id'
+      )
+    `);
     
     console.log('✅ Dados existentes removidos');
   }

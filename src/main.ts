@@ -18,7 +18,9 @@ process.env.APP_ROOT = path.join(__dirname, '..');
 
 export const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL'];
 export const MAIN_DIST = path.join(process.env.APP_ROOT, 'dist-electron');
-export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist');
+export const RENDERER_DIST = app.isPackaged 
+  ? path.join(process.resourcesPath, 'app.asar/dist')
+  : path.join(process.env.APP_ROOT, 'dist');
 
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST;
 
@@ -56,17 +58,17 @@ function createWindow() {
   console.log('RENDERER_DIST:', RENDERER_DIST);
   console.log('NODE_ENV:', process.env.NODE_ENV);
   console.log('app.isPackaged:', app.isPackaged);
-  
+
   // Force dev server URL in development
   const isDev = !app.isPackaged;
   let devServerUrl = VITE_DEV_SERVER_URL;
-  
+
   // If VITE_DEV_SERVER_URL is not set but we're in dev mode, use the configured port
   if (!devServerUrl && isDev) {
     devServerUrl = 'http://localhost:5180';
     console.log('VITE_DEV_SERVER_URL not set, using configured port:', devServerUrl);
   }
-  
+
   if (devServerUrl) {
     console.log('Loading dev server URL:', devServerUrl);
     win.loadURL(devServerUrl).catch(error => {
@@ -74,12 +76,18 @@ function createWindow() {
       // Fallback to file
       const indexPath = path.join(RENDERER_DIST, 'index.html');
       console.log('Falling back to file:', indexPath);
-      win.loadFile(indexPath);
+      win?.loadFile(indexPath);
     });
   } else {
+    // Em produção, usar o caminho correto
     const indexPath = path.join(RENDERER_DIST, 'index.html');
+
     console.log('Loading file:', indexPath);
-    win.loadFile(indexPath);
+    win.loadFile(indexPath).catch(error => {
+      console.error('Falha ao carregar:', error);
+      // Como último recurso, carregar uma página de erro simples
+      win.loadURL('data:text/html;charset=utf-8,<h1>Erro ao carregar aplicação</h1><p>Contate o suporte técnico.</p>');
+    });
   }
 
   // Timeout para mostrar janela mesmo se não carregar completamente
@@ -95,7 +103,7 @@ function createWindow() {
     clearTimeout(showTimeout);
     console.log('Janela pronta para exibição');
     win?.show();
-    
+
     if (process.env.NODE_ENV === 'development') {
       win?.webContents.openDevTools();
     }
@@ -323,23 +331,23 @@ app.on('activate', () => {
 app.whenReady().then(async () => {
   try {
     console.log('Inicializando aplicação...');
-    
+
     // Criar janela principal
     createWindow();
-    
+
     console.log('Aplicação inicializada com sucesso!');
-    
+
     // Registrar handlers IPC com timeout para não bloquear indefinidamente
     Promise.race([
       registerIpcHandlers(),
-      new Promise((_, reject) => 
+      new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Timeout na inicialização dos serviços')), 30000)
       )
     ]).catch(error => {
       console.error('Erro ao inicializar serviços:', error);
       console.log('Aplicação continuará funcionando com funcionalidade limitada');
     });
-    
+
   } catch (error) {
     console.error('Erro ao inicializar aplicação:', error);
     app.quit();
@@ -359,13 +367,13 @@ async function registerIpcHandlers() {
       console.log('📚 Handler get-livros chamado');
       console.log('📚 bibliaService disponível?', !!bibliaService);
       console.log('📚 bibliaService.getLivros é função?', typeof bibliaService.getLivros);
-      
+
       const result = await bibliaService.getLivros();
       console.log('📚 Result get-livros completo:', JSON.stringify(result, null, 2));
       console.log('📚 Result success:', result.success);
       console.log('📚 Result data length:', result.data?.length);
       console.log('📚 Result error:', result.error);
-      
+
       // Sempre retornar estrutura completa DatabaseResponse
       if (result.success && result.data) {
         const response = { success: true, data: result.data };
@@ -401,13 +409,13 @@ async function registerIpcHandlers() {
       console.log('📖 Handler get-versiculos-capitulo chamado com:', { livroId, capitulo });
       console.log('📖 bibliaService disponível?', !!bibliaService);
       console.log('📖 bibliaService.getVersiculosCapitulo é função?', typeof bibliaService.getVersiculosCapitulo);
-      
+
       const result = await bibliaService.getVersiculosCapitulo(livroId, capitulo);
       console.log('📖 Result get-versiculos-capitulo completo:', JSON.stringify(result, null, 2));
       console.log('📖 Result success:', result.success);
       console.log('📖 Result data length:', result.data?.length);
       console.log('📖 Result error:', result.error);
-      
+
       // Sempre retornar estrutura completa DatabaseResponse
       if (result.success && result.data) {
         const response = { success: true, data: result.data };

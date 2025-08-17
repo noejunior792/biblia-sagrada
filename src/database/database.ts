@@ -310,13 +310,25 @@ export class BibliaDatabase {
 
   // Método para atualizar índice FTS
   async updateFTSIndex(): Promise<void> {
-    await this.run(`DELETE FROM versiculos_fts`);
-    await this.run(`
-      INSERT INTO versiculos_fts (rowid, livro_nome, capitulo, numero, texto)
-      SELECT v.id, l.nome, v.capitulo, v.numero, v.texto
-      FROM versiculos v
-      JOIN livros l ON v.livro_id = l.id
-    `);
+    // Para FTS5 contentless, usamos rebuild ao invés de DELETE
+    try {
+      await this.run(`INSERT INTO versiculos_fts(versiculos_fts) VALUES('rebuild')`);
+    } catch (error) {
+      console.log('⚠️ Aviso ao reconstruir FTS5:', error);
+      // Fallback: recriar a tabela FTS5
+      await this.run(`DROP TABLE IF EXISTS versiculos_fts`);
+      await this.run(`
+        CREATE VIRTUAL TABLE IF NOT EXISTS versiculos_fts USING fts5(
+          livro_nome,
+          capitulo,
+          numero,
+          texto,
+          content='versiculos',
+          content_rowid='id'
+        )
+      `);
+      await this.run(`INSERT INTO versiculos_fts(versiculos_fts) VALUES('rebuild')`);
+    }
   }
 }
 
