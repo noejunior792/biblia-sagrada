@@ -374,7 +374,9 @@ async function registerIpcHandlers() {
       console.log('⚠️ Usando serviço sem inicialização completa');
     } catch (recoveryError) {
       console.error('💥 Falha na recuperação do serviço:', recoveryError);
-      throw new Error('Não foi possível inicializar o serviço da Bíblia');
+      // Don't throw error to prevent app from closing
+      console.log('⚠️ Continuando sem serviço da Bíblia - app funcionará com funcionalidade limitada');
+      bibliaService = null;
     }
   }
 
@@ -656,6 +658,17 @@ async function registerIpcHandlers() {
   console.log('✅ Todos os handlers IPC registrados com sucesso!');
 }
 
+// Prevent unexpected crashes
+process.on('uncaughtException', (error) => {
+  console.error('❌ Exceção não capturada:', error);
+  console.log('⚠️ Aplicação continuará funcionando...');
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Promise rejeitada não tratada:', reason);
+  console.log('⚠️ Aplicação continuará funcionando...');
+});
+
 // Cleanup on quit
 app.on('before-quit', async () => {
   console.log('Aplicação sendo encerrada...');
@@ -680,5 +693,22 @@ if (!gotTheLock) {
 app.on('web-contents-created', (event, contents) => {
   contents.setWindowOpenHandler(() => {
     return { action: 'deny' };
+  });
+  
+  // Prevent crashes from renderer errors
+  contents.on('crashed', (event, killed) => {
+    console.error('❌ Renderer process crashed:', { killed });
+    if (win && !win.isDestroyed()) {
+      console.log('🔄 Tentando recarregar a janela...');
+      win.reload();
+    }
+  });
+  
+  contents.on('unresponsive', () => {
+    console.error('❌ Renderer process unresponsive');
+  });
+  
+  contents.on('responsive', () => {
+    console.log('✅ Renderer process responsive again');
   });
 });

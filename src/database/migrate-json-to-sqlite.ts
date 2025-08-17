@@ -18,6 +18,7 @@ interface BookMapping {
 class JSONToSQLiteMigrator {
   private db: BibliaDatabase;
   private bibliaData: BibliaJSON[] = [];
+  private shouldCloseDb: boolean = true;
   
   // Mapeamento completo dos livros da Bíblia
   private bookMappings: BookMapping[] = [
@@ -94,8 +95,14 @@ class JSONToSQLiteMigrator {
     { abbrev: 'Ap', nome: 'Apocalipse', testamento: 'Novo', ordem: 66 }
   ];
 
-  constructor() {
-    this.db = new BibliaDatabase();
+  constructor(externalDb?: BibliaDatabase) {
+    if (externalDb) {
+      this.db = externalDb;
+      this.shouldCloseDb = false; // Don't close externally provided database
+    } else {
+      this.db = new BibliaDatabase();
+      this.shouldCloseDb = true;
+    }
   }
 
   private async loadBibliaJSON(): Promise<void> {
@@ -382,15 +389,35 @@ class JSONToSQLiteMigrator {
   }
 
   async migrate(): Promise<void> {
-    const startTime = Date.now();
     console.log('🚀 Iniciando migração do JSON para SQLite...\n');
     
+    // Add timeout to entire migration process
+    const migrationTimeout = new Promise<never>((_, reject) => 
+      setTimeout(() => reject(new Error('Migration timeout - process took too long')), 300000) // 5 minutes
+    );
+    
+    try {
+      await Promise.race([
+        this.performMigration(),
+        migrationTimeout
+      ]);
+      
+    } catch (error) {
+      console.error('❌ Erro durante a migração:', error);
+      throw error;
+    }
+  }
+
+  private async performMigration(): Promise<void> {
+    const startTime = Date.now();
     let dbInitialized = false;
     
     try {
       // 1. Inicializar banco de dados
       console.log('🔧 Inicializando banco de dados...');
-      await this.db.initialize();
+      if (this.shouldCloseDb) {
+        await this.db.initialize();
+      }
       dbInitialized = true;
       
       // 2. Carregar dados do JSON
@@ -456,7 +483,7 @@ class JSONToSQLiteMigrator {
       
       throw error;
     } finally {
-      if (dbInitialized) {
+      if (dbInitialized && this.shouldCloseDb) {
         try {
           await this.db.close();
         } catch (closeError) {
@@ -472,7 +499,7 @@ class JSONToSQLiteMigrator {
 let migrationInProgress = false;
 let migrationPromise: Promise<void> | null = null;
 
-export async function migrateJSONToSQLite(): Promise<void> {
+export async function migrateJSONToSQLite(externalDb?: BibliaDatabase): Promise<void> {
   if (migrationInProgress) {
     console.log('⏳ Migração já em andamento, aguardando...');
     if (migrationPromise) {
@@ -485,7 +512,7 @@ export async function migrateJSONToSQLite(): Promise<void> {
   
   try {
     migrationPromise = (async () => {
-      const migrator = new JSONToSQLiteMigrator();
+      const migrator = new JSONToSQLiteMigrator(externalDb);
       await migrator.migrate();
     })();
     
@@ -501,16 +528,24 @@ export async function migrateJSONToSQLite(): Promise<void> {
 }
 
 // Função para verificar se a migração é necessária
-export async function isMigrationNeeded(): Promise<boolean> {
+export async function isMigrationNeeded(externalDb?: BibliaDatabase): Promise<boolean> {
   // Se migração está em andamento, considerar que não é necessária
   if (migrationInProgress) {
     return false;
   }
 
-  const db = new BibliaDatabase();
+  let db = externalDb;
+  let shouldCloseDb = false;
+  
+  if (!db) {
+    db = new BibliaDatabase();
+    shouldCloseDb = true;
+  }
   
   try {
-    await db.initialize();
+    if (shouldCloseDb) {
+      await db.initialize();
+    }
     
     // Verificar se as tabelas existem
     const tablesExist = await db.get<{ count: number }>(`
@@ -519,22 +554,28 @@ export async function isMigrationNeeded(): Promise<boolean> {
     `);
     
     if (!tablesExist || tablesExist.count < 2) {
-      await db.close();
+      if (shouldCloseDb) {
+        await db.close();
+      }
       return true;
     }
     
     // Verificar se há versículos
     const result = await db.get<{ count: number }>('SELECT COUNT(*) as count FROM versiculos');
-    await db.close();
+    if (shouldCloseDb) {
+      await db.close();
+    }
     
     // Se não há versículos, migração é necessária
     return !result || result.count === 0;
   } catch (error) {
     console.error('Erro ao verificar se migração é necessária:', error);
-    try {
-      await db.close();
-    } catch (closeError) {
-      console.error('Erro ao fechar banco durante verificação:', closeError);
+    if (shouldCloseDb) {
+      try {
+        await db.close();
+      } catch (closeError) {
+        console.error('Erro ao fechar banco durante verificação:', closeError);
+      }
     }
     // Em caso de erro crítico, não assumir migração necessária para evitar loops
     if (error instanceof Error && error.message.includes('SQLITE_BUSY')) {

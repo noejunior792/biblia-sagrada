@@ -64,7 +64,7 @@ export class HybridBibliaService {
       // Verificar se migração é necessária
       let needsMigration = false;
       try {
-        needsMigration = await isMigrationNeeded();
+        needsMigration = await isMigrationNeeded(this.db);
       } catch (migrationCheckError) {
         console.error('❌ Erro ao verificar migração:', migrationCheckError);
         // Se não conseguir verificar, assumir que precisa de migração
@@ -73,12 +73,23 @@ export class HybridBibliaService {
       
       if (needsMigration) {
         console.log('📦 Migração necessária. Executando migração do JSON para SQLite...');
+        console.log('🔧 Estado antes da migração: DB inicializado, usando instância existente');
         try {
-          await migrateJSONToSQLite();
+          // Pass the existing database connection to migration to prevent closing it
+          console.log('⏳ Iniciando processo de migração...');
+          await migrateJSONToSQLite(this.db);
+          console.log('✅ Migração do JSON para SQLite concluída com sucesso');
           this.useSQLite = true;
-          console.log('✅ Migração concluída. Usando SQLite.');
+          console.log('✅ Serviço configurado para usar SQLite');
+          
+          // Verify database is still functional after migration
+          console.log('🔍 Verificando funcionalidade do banco após migração...');
+          const testQuery = await this.db.get<{ count: number }>('SELECT COUNT(*) as count FROM livros');
+          console.log(`✅ Verificação pós-migração: ${testQuery?.count || 0} livros encontrados`);
+          
         } catch (migrationError) {
           console.error('❌ Erro na migração, usando fallback JSON:', migrationError);
+          console.error('📊 Stack trace da migração:', migrationError instanceof Error ? migrationError.stack : 'N/A');
           throw new Error('MIGRATION_FAILED');
         }
       } else {
@@ -87,30 +98,39 @@ export class HybridBibliaService {
       }
 
       this.initialized = true;
-      console.log('✅ Serviço inicializado com SQLite');
+      console.log('✅ Serviço híbrido inicializado com SQLite');
+      console.log('📋 Estado final: SQLite ativo, serviço pronto para uso');
       
     } catch (error) {
       console.error('❌ Erro ao inicializar serviço SQLite, usando fallback JSON:', error);
+      console.error('📊 Detalhes do erro de inicialização:', error instanceof Error ? error.message : String(error));
       
-      // Tentar fechar conexão SQLite em caso de erro
+      // Tentar fechar conexão SQLite em caso de erro (mas não fechar se foi passada externamente)
       try {
+        // Only close if we created the connection ourselves
+        console.log('🔧 Tentando limpar conexão SQLite...');
         await this.db.close();
+        console.log('✅ Conexão SQLite fechada durante fallback');
       } catch (closeError) {
         console.error('⚠️ Erro ao fechar banco durante fallback:', closeError);
       }
       
       // Fallback para JSON
+      console.log('🔄 Iniciando fallback para serviço JSON...');
       this.useSQLite = false;
       try {
         this.jsonService = new JSONBibliaService();
         console.log('✅ Serviço JSON inicializado como fallback');
+        console.log('📋 Estado fallback: SQLite desabilitado, JSON ativo');
       } catch (jsonError) {
         console.error('❌ Erro crítico: não foi possível inicializar nem SQLite nem JSON:', jsonError);
+        console.error('💥 Sistema será inicializado em estado limitado');
         // Mesmo assim, marcar como inicializado para evitar loops infinitos
       }
       this.initialized = true;
     } finally {
       this.initializing = false;
+      console.log('🏁 Processo de inicialização finalizado');
     }
   }
 
@@ -707,7 +727,7 @@ export class HybridBibliaService {
 
 // Instância singleton
 let serviceInstance: HybridBibliaService | null = null;
-let initPromise: Promise<HybridBibliaService> | null = null;
+let initPromise: Promise<void> | null = null;
 
 export const getBibliaService = (): HybridBibliaService => {
   if (!serviceInstance) {
@@ -724,17 +744,22 @@ export const initBibliaService = async (): Promise<HybridBibliaService> => {
         const service = getBibliaService();
         await service.initialize();
         console.log('✅ Serviço híbrido da Bíblia inicializado');
-        return service;
       } catch (error) {
         console.error('❌ Erro ao inicializar serviço da Bíblia:', error);
         // Reset promise para permitir retry
         initPromise = null;
-        // Don't throw, just return service with JSON fallback
+        // Don't throw, just use service with JSON fallback
         const service = getBibliaService();
-        return service;
+        // Force initialization of JSON service as fallback
+        try {
+          await service.initialize();
+        } catch (fallbackError) {
+          console.error('❌ Erro no fallback:', fallbackError);
+        }
       }
     })();
   }
   
-  return initPromise;
+  await initPromise;
+  return getBibliaService();
 };
