@@ -43,7 +43,7 @@ export class BibliaDatabase {
     await this.run('PRAGMA busy_timeout = 30000');
     // Enable foreign keys
     await this.run('PRAGMA foreign_keys = ON');
-    
+
     console.log('✅ Configurações do banco aplicadas');
   }
 
@@ -57,7 +57,7 @@ export class BibliaDatabase {
         ordem INTEGER NOT NULL,
         capitulos_total INTEGER NOT NULL
       )`,
-      
+
       `CREATE TABLE IF NOT EXISTS capitulos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         livro_id INTEGER NOT NULL,
@@ -66,7 +66,7 @@ export class BibliaDatabase {
         FOREIGN KEY (livro_id) REFERENCES livros(id),
         UNIQUE(livro_id, numero)
       )`,
-      
+
       `CREATE TABLE IF NOT EXISTS versiculos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         livro_id INTEGER NOT NULL,
@@ -76,7 +76,7 @@ export class BibliaDatabase {
         FOREIGN KEY (livro_id) REFERENCES livros(id),
         UNIQUE(livro_id, capitulo, numero)
       )`,
-      
+
       `CREATE TABLE IF NOT EXISTS favoritos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         versiculo_id INTEGER NOT NULL,
@@ -84,7 +84,7 @@ export class BibliaDatabase {
         FOREIGN KEY (versiculo_id) REFERENCES versiculos(id),
         UNIQUE(versiculo_id)
       )`,
-      
+
       `CREATE TABLE IF NOT EXISTS anotacoes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         versiculo_id INTEGER NOT NULL,
@@ -94,7 +94,7 @@ export class BibliaDatabase {
         atualizado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (versiculo_id) REFERENCES versiculos(id)
       )`,
-      
+
       `CREATE TABLE IF NOT EXISTS historico_leitura (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         livro_id INTEGER NOT NULL,
@@ -102,7 +102,7 @@ export class BibliaDatabase {
         acessado_em DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (livro_id) REFERENCES livros(id)
       )`,
-      
+
       `CREATE TABLE IF NOT EXISTS configuracoes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         chave TEXT UNIQUE NOT NULL,
@@ -160,7 +160,7 @@ export class BibliaDatabase {
         reject(new Error('Database não inicializado'));
         return;
       }
-      
+
       this.db.run(sql, params, function(err) {
         if (err) {
           reject(err);
@@ -177,7 +177,7 @@ export class BibliaDatabase {
         reject(new Error('Database não inicializado'));
         return;
       }
-      
+
       this.db.get(sql, params, (err, row) => {
         if (err) {
           reject(err);
@@ -194,7 +194,7 @@ export class BibliaDatabase {
         reject(new Error('Database não inicializado'));
         return;
       }
-      
+
       this.db.all(sql, params, (err, rows) => {
         if (err) {
           reject(err);
@@ -211,22 +211,22 @@ export class BibliaDatabase {
         resolve();
         return;
       }
-      
+
       // Close WAL mode properly before closing database
       this.db.run('PRAGMA wal_checkpoint(TRUNCATE)', (err) => {
         if (err) {
           console.warn('Aviso ao fazer checkpoint WAL:', err);
         }
-        
-        this.db!.close((closeErr) => {
-          if (closeErr) {
-            reject(closeErr);
-          } else {
-            console.log('Conexão com banco de dados fechada');
-            this.db = null;
-            resolve();
-          }
-        });
+
+        // this.db!.close((closeErr) => {
+        //   if (closeErr) {
+        //     reject(closeErr);
+        //   } else {
+        //     console.log('Conexão com banco de dados fechada');
+        //     this.db = null;
+        //     resolve();
+        //   }
+        // });
       });
     });
   }
@@ -241,7 +241,7 @@ export class BibliaDatabase {
     }
 
     console.log('Populando banco com dados da Bíblia...');
-    
+
     // Inserir livros do Antigo Testamento
     const antigoTestamento = [
       { nome: 'Gênesis', abreviacao: 'Gn', capitulos: 50 },
