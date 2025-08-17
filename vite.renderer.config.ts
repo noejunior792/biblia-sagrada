@@ -11,8 +11,8 @@ export default defineConfig({
     sourcemap: true,
   },
   server: {
-    port: 5174,
-    strictPort: false,
+    port: 5180,
+    strictPort: true,
     host: 'localhost',
   },
   resolve: {

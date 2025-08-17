@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, Menu } from 'electron';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { initJSONBibliaService } from './database/json-service';
+import { initBibliaService } from './database/biblia-service';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -59,24 +59,55 @@ function createWindow() {
   
   // Force dev server URL in development
   const isDev = !app.isPackaged;
-  const devServerUrl = VITE_DEV_SERVER_URL || (isDev ? 'http://localhost:5174' : null);
+  let devServerUrl = VITE_DEV_SERVER_URL;
+  
+  // If VITE_DEV_SERVER_URL is not set but we're in dev mode, use the configured port
+  if (!devServerUrl && isDev) {
+    devServerUrl = 'http://localhost:5180';
+    console.log('VITE_DEV_SERVER_URL not set, using configured port:', devServerUrl);
+  }
   
   if (devServerUrl) {
     console.log('Loading dev server URL:', devServerUrl);
-    win.loadURL(devServerUrl);
+    win.loadURL(devServerUrl).catch(error => {
+      console.error('Failed to load dev server URL:', error);
+      // Fallback to file
+      const indexPath = path.join(RENDERER_DIST, 'index.html');
+      console.log('Falling back to file:', indexPath);
+      win.loadFile(indexPath);
+    });
   } else {
     const indexPath = path.join(RENDERER_DIST, 'index.html');
     console.log('Loading file:', indexPath);
     win.loadFile(indexPath);
   }
 
+  // Timeout para mostrar janela mesmo se não carregar completamente
+  const showTimeout = setTimeout(() => {
+    if (win && !win.isVisible()) {
+      console.log('Forçando exibição da janela após timeout');
+      win.show();
+    }
+  }, 10000); // 10 segundos
+
   // Mostrar janela quando estiver pronta
   win.once('ready-to-show', () => {
+    clearTimeout(showTimeout);
+    console.log('Janela pronta para exibição');
     win?.show();
     
     if (process.env.NODE_ENV === 'development') {
       win?.webContents.openDevTools();
     }
+  });
+
+  // Log adicional para debug
+  win.webContents.once('did-finish-load', () => {
+    console.log('Conteúdo da janela carregado com sucesso');
+  });
+
+  win.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    console.error('Falha ao carregar:', { errorCode, errorDescription, validatedURL });
   });
 
   // Gerenciar fechamento da janela
@@ -291,18 +322,23 @@ app.on('activate', () => {
 
 app.whenReady().then(async () => {
   try {
-    console.log('Inicializando serviço da Bíblia...');
+    console.log('Inicializando aplicação...');
     
     // Criar janela principal
     createWindow();
     
-    // Registrar handlers IPC
-    registerIpcHandlers().catch(error => {
-      console.error('Erro ao inicializar aplicação:', error);
-      app.quit();
-    });
-    
     console.log('Aplicação inicializada com sucesso!');
+    
+    // Registrar handlers IPC com timeout para não bloquear indefinidamente
+    Promise.race([
+      registerIpcHandlers(),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout na inicialização dos serviços')), 30000)
+      )
+    ]).catch(error => {
+      console.error('Erro ao inicializar serviços:', error);
+      console.log('Aplicação continuará funcionando com funcionalidade limitada');
+    });
     
   } catch (error) {
     console.error('Erro ao inicializar aplicação:', error);
@@ -312,13 +348,14 @@ app.whenReady().then(async () => {
 
 // IPC Handlers para comunicação com o renderer
 async function registerIpcHandlers() {
-  console.log('Inicializando serviço da Bíblia...');
-  const bibliaService = await initJSONBibliaService();
+  console.log('Inicializando serviço híbrido da Bíblia...');
+  const bibliaService = await initBibliaService();
 
   // Livros
   ipcMain.handle('get-livros', async () => {
     try {
-      return await bibliaService.getLivros();
+      const result = await bibliaService.getLivros();
+      return result.success ? result.data : { success: false, error: result.error };
     } catch (error) {
       console.error('Erro ao buscar livros:', error);
       return { success: false, error: (error as Error).message };
@@ -327,7 +364,8 @@ async function registerIpcHandlers() {
 
   ipcMain.handle('get-livro', async (_, id: number) => {
     try {
-      return await bibliaService.getLivro(id);
+      const result = await bibliaService.getLivro(id);
+      return result.success ? result.data : { success: false, error: result.error };
     } catch (error) {
       console.error('Erro ao buscar livro:', error);
       return { success: false, error: (error as Error).message };
@@ -337,7 +375,8 @@ async function registerIpcHandlers() {
   // Versículos
   ipcMain.handle('get-versiculos-capitulo', async (_, livroId: number, capitulo: number) => {
     try {
-      return await bibliaService.getVersiculosCapitulo(livroId, capitulo);
+      const result = await bibliaService.getVersiculosCapitulo(livroId, capitulo);
+      return result.success ? result.data : { success: false, error: result.error };
     } catch (error) {
       console.error('Erro ao buscar versículos:', error);
       return { success: false, error: (error as Error).message };
@@ -346,7 +385,8 @@ async function registerIpcHandlers() {
 
   ipcMain.handle('get-versiculo', async (_, id: number) => {
     try {
-      return await bibliaService.getVersiculo(id);
+      const result = await bibliaService.getVersiculo(id);
+      return result.success ? result.data : { success: false, error: result.error };
     } catch (error) {
       console.error('Erro ao buscar versículo:', error);
       return { success: false, error: (error as Error).message };
@@ -356,7 +396,8 @@ async function registerIpcHandlers() {
   // Busca
   ipcMain.handle('buscar-versiculos', async (_, parametros) => {
     try {
-      return await bibliaService.buscarVersiculos(parametros);
+      const result = await bibliaService.buscarVersiculos(parametros);
+      return result.success ? result.data : { success: false, error: result.error };
     } catch (error) {
       console.error('Erro ao buscar versículos:', error);
       return { success: false, error: (error as Error).message };
@@ -366,7 +407,8 @@ async function registerIpcHandlers() {
   // Favoritos
   ipcMain.handle('get-favoritos', async () => {
     try {
-      return await bibliaService.getFavoritos();
+      const result = await bibliaService.getFavoritos();
+      return result.success ? result.data : { success: false, error: result.error };
     } catch (error) {
       console.error('Erro ao buscar favoritos:', error);
       return { success: false, error: (error as Error).message };
@@ -375,7 +417,8 @@ async function registerIpcHandlers() {
 
   ipcMain.handle('adicionar-favorito', async (_, versiculoId: number) => {
     try {
-      return await bibliaService.adicionarFavorito(versiculoId);
+      const result = await bibliaService.adicionarFavorito(versiculoId);
+      return result.success ? { success: true } : { success: false, error: result.error };
     } catch (error) {
       console.error('Erro ao adicionar favorito:', error);
       return { success: false, error: (error as Error).message };
@@ -384,7 +427,8 @@ async function registerIpcHandlers() {
 
   ipcMain.handle('remover-favorito', async (_, versiculoId: number) => {
     try {
-      return await bibliaService.removerFavorito(versiculoId);
+      const result = await bibliaService.removerFavorito(versiculoId);
+      return result.success ? { success: true } : { success: false, error: result.error };
     } catch (error) {
       console.error('Erro ao remover favorito:', error);
       return { success: false, error: (error as Error).message };
@@ -393,7 +437,8 @@ async function registerIpcHandlers() {
 
   ipcMain.handle('verificar-favorito', async (_, versiculoId: number) => {
     try {
-      return await bibliaService.verificarFavorito(versiculoId);
+      const result = await bibliaService.verificarFavorito(versiculoId);
+      return result.success ? result.data : { success: false, error: result.error };
     } catch (error) {
       console.error('Erro ao verificar favorito:', error);
       return { success: false, error: (error as Error).message };
@@ -403,7 +448,8 @@ async function registerIpcHandlers() {
   // Anotações
   ipcMain.handle('get-anotacoes', async () => {
     try {
-      return await bibliaService.getAnotacoes();
+      const result = await bibliaService.getAnotacoes();
+      return result.success ? result.data : { success: false, error: result.error };
     } catch (error) {
       console.error('Erro ao buscar anotações:', error);
       return { success: false, error: (error as Error).message };
@@ -412,7 +458,8 @@ async function registerIpcHandlers() {
 
   ipcMain.handle('get-anotacoes-versiculo', async (_, versiculoId: number) => {
     try {
-      return await bibliaService.getAnotacoesVersiculo(versiculoId);
+      const result = await bibliaService.getAnotacoesVersiculo(versiculoId);
+      return result.success ? result.data : { success: false, error: result.error };
     } catch (error) {
       console.error('Erro ao buscar anotações do versículo:', error);
       return { success: false, error: (error as Error).message };
@@ -421,7 +468,8 @@ async function registerIpcHandlers() {
 
   ipcMain.handle('adicionar-anotacao', async (_, versiculoId: number, titulo: string, conteudo: string) => {
     try {
-      return await bibliaService.adicionarAnotacao(versiculoId, titulo, conteudo);
+      const result = await bibliaService.adicionarAnotacao(versiculoId, titulo, conteudo);
+      return result.success ? result.data : { success: false, error: result.error };
     } catch (error) {
       console.error('Erro ao adicionar anotação:', error);
       return { success: false, error: (error as Error).message };
@@ -430,7 +478,8 @@ async function registerIpcHandlers() {
 
   ipcMain.handle('atualizar-anotacao', async (_, id: number, titulo: string, conteudo: string) => {
     try {
-      return await bibliaService.atualizarAnotacao(id, titulo, conteudo);
+      const result = await bibliaService.atualizarAnotacao(id, titulo, conteudo);
+      return result.success ? { success: true } : { success: false, error: result.error };
     } catch (error) {
       console.error('Erro ao atualizar anotação:', error);
       return { success: false, error: (error as Error).message };
@@ -439,7 +488,8 @@ async function registerIpcHandlers() {
 
   ipcMain.handle('remover-anotacao', async (_, id: number) => {
     try {
-      return await bibliaService.removerAnotacao(id);
+      const result = await bibliaService.removerAnotacao(id);
+      return result.success ? { success: true } : { success: false, error: result.error };
     } catch (error) {
       console.error('Erro ao remover anotação:', error);
       return { success: false, error: (error as Error).message };
@@ -449,7 +499,8 @@ async function registerIpcHandlers() {
   // Histórico
   ipcMain.handle('adicionar-historico', async (_, livroId: number, capitulo: number) => {
     try {
-      return await bibliaService.adicionarHistorico(livroId, capitulo);
+      const result = await bibliaService.adicionarHistorico(livroId, capitulo);
+      return result.success ? { success: true } : { success: false, error: result.error };
     } catch (error) {
       console.error('Erro ao adicionar ao histórico:', error);
       return { success: false, error: (error as Error).message };
@@ -458,7 +509,8 @@ async function registerIpcHandlers() {
 
   ipcMain.handle('get-historico', async () => {
     try {
-      return await bibliaService.getHistorico();
+      const result = await bibliaService.getHistorico();
+      return result.success ? result.data : { success: false, error: result.error };
     } catch (error) {
       console.error('Erro ao buscar histórico:', error);
       return { success: false, error: (error as Error).message };
@@ -468,7 +520,8 @@ async function registerIpcHandlers() {
   // Versículo do dia
   ipcMain.handle('get-versiculo-dia', async () => {
     try {
-      return await bibliaService.getVersiculoDia();
+      const result = await bibliaService.getVersiculoDia();
+      return result.success ? result.data : { success: false, error: result.error };
     } catch (error) {
       console.error('Erro ao buscar versículo do dia:', error);
       return { success: false, error: (error as Error).message };
@@ -478,7 +531,8 @@ async function registerIpcHandlers() {
   // Configurações
   ipcMain.handle('get-configuracao', async (_, chave: string) => {
     try {
-      return await bibliaService.getConfiguracao(chave);
+      const result = await bibliaService.getConfiguracao(chave);
+      return result.success ? result.data : { success: false, error: result.error };
     } catch (error) {
       console.error('Erro ao buscar configuração:', error);
       return { success: false, error: (error as Error).message };
@@ -487,7 +541,8 @@ async function registerIpcHandlers() {
 
   ipcMain.handle('set-configuracao', async (_, chave: string, valor: string) => {
     try {
-      return await bibliaService.setConfiguracao(chave, valor);
+      const result = await bibliaService.setConfiguracao(chave, valor);
+      return result.success ? { success: true } : { success: false, error: result.error };
     } catch (error) {
       console.error('Erro ao salvar configuração:', error);
       return { success: false, error: (error as Error).message };
@@ -497,7 +552,8 @@ async function registerIpcHandlers() {
   // Estatísticas
   ipcMain.handle('get-estatisticas', async () => {
     try {
-      return await bibliaService.getEstatisticas();
+      const result = await bibliaService.getEstatisticas();
+      return result.success ? result.data : { success: false, error: result.error };
     } catch (error) {
       console.error('Erro ao buscar estatísticas:', error);
       return { success: false, error: (error as Error).message };

@@ -4,6 +4,7 @@ import { MakerZIP } from '@electron-forge/maker-zip';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
 import { VitePlugin } from '@electron-forge/plugin-vite';
+import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
@@ -17,13 +18,14 @@ const config: ForgeConfig = {
     icon: './assets/icon',
     ignore: [
       /^\/\.vscode\//,
-      /^\/assets\//,
       /^\/\.git\//,
-      /^\/node_modules\/(?!sqlite3)/,
       /^\/src\//,
       /\.map$/,
       /\.md$/,
-      /\.log$/
+      /\.log$/,
+      /^\/scripts\//,
+      /^\/\.temp\//,
+      /^\/\.tmp\//
     ],
     extraResource: [
       './assets'
@@ -75,6 +77,7 @@ const config: ForgeConfig = {
   ],
   publishers: [],
   plugins: [
+    new AutoUnpackNativesPlugin({}),
     new VitePlugin({
       build: [
         {

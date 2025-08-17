@@ -91,8 +91,14 @@ export class JSONBibliaService {
     let ordem = 1;
     this.livros = [];
 
+    if (!this.bibliaData) {
+      console.error('Dados da Bíblia não carregados');
+      return;
+    }
+
     Object.keys(this.bibliaData).forEach((key, index) => {
-      const bookData = this.bibliaData![key];
+      const bookData = this.bibliaData?.[key];
+      if (!bookData) return;
       const isAT = livrosAT.includes(key.toLowerCase());
       
       this.livros.push({
@@ -127,7 +133,10 @@ export class JSONBibliaService {
           if (!this.anotacoes.has(key)) {
             this.anotacoes.set(key, []);
           }
-          this.anotacoes.get(key)!.push(anotacao);
+          const anotacoesList = this.anotacoes.get(key);
+          if (anotacoesList) {
+            anotacoesList.push(anotacao);
+          }
         });
       }
 
@@ -204,8 +213,12 @@ export class JSONBibliaService {
       }
 
       // Encontrar o livro nos dados JSON
+      if (!this.bibliaData) {
+        return { success: false, error: 'Dados da Bíblia não carregados' };
+      }
+
       const bookKey = Object.keys(this.bibliaData).find(key => 
-        this.bibliaData![key].name === livro.nome
+        this.bibliaData?.[key]?.name === livro.nome
       );
 
       if (!bookKey || !this.bibliaData[bookKey]) {
@@ -293,7 +306,7 @@ export class JSONBibliaService {
 
         // Encontrar dados do livro
         const bookKey = Object.keys(this.bibliaData).find(key => 
-          this.bibliaData![key].name === livro.nome
+          this.bibliaData?.[key]?.name === livro.nome
         );
 
         if (!bookKey) continue;
@@ -435,7 +448,10 @@ export class JSONBibliaService {
       if (!this.anotacoes.has(key)) {
         this.anotacoes.set(key, []);
       }
-      this.anotacoes.get(key)!.push(novaAnotacao);
+      const anotacoesList = this.anotacoes.get(key);
+      if (anotacoesList) {
+        anotacoesList.push(novaAnotacao);
+      }
       this.saveLocalData();
 
       return { success: true, data: novaAnotacao };
@@ -644,11 +660,11 @@ export const initJSONBibliaService = async (): Promise<JSONBibliaService> => {
     return initPromise;
   }
   
-  initPromise = new Promise((resolve) => {
+  initPromise = new Promise<JSONBibliaService>((resolve) => {
     if (!serviceInstance) {
       serviceInstance = new JSONBibliaService();
       // Wait a bit for initialization to complete
-      setTimeout(() => resolve(serviceInstance), 100);
+      setTimeout(() => resolve(serviceInstance as JSONBibliaService), 100);
     } else {
       resolve(serviceInstance);
     }
