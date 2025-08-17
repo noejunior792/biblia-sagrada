@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Bíblia Sagrada King James em Português - Aplicativo completo para estudo bíblico offline" />
+    <meta name="keywords" content="bíblia, king james, português, estudo bíblico, versículos, favoritos, anotações" />
+    <meta name="author" content="Bíblia Sagrada App" />
+    
+    <!-- Meta tags para Electron -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;" />
+    
+    <!-- Ícones e tema -->
+    <link rel="icon" type="image/png" href="/icon.png" />
+    <link rel="apple-touch-icon" href="/icon.png" />
+    
+    <!-- Meta tags para tema -->
+    <meta name="theme-color" content="#3b82f6" />
+    <meta name="color-scheme" content="light dark" />
+    
+    <!-- Preload de recursos críticos -->
+    <link rel="preload" href="/fonts/inter.woff2" as="font" type="font/woff2" crossorigin />
+    
+    <title>Bíblia Sagrada</title>
+    
+    <!-- Estilos inline críticos para evitar FOUC -->
+    <style>
+        /* Estilos críticos para carregamento inicial */
+        #root {
+            min-height: 100vh;
+            background-color: #ffffff;
+            color: #1f2937;
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            #root {
+                background-color: #111827;
+                color: #f9fafb;
+            }
+        }
+        
+        /* Loading spinner inicial */
+        .initial-loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: inherit;
+            z-index: 9999;
+        }
+        
+        .loading-spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid #e5e7eb;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            margin-top: 16px;
+            font-size: 14px;
+            color: #6b7280;
+        }
+        
+        /* Ocultar loading quando app carrega */
+        .app-loaded .initial-loading {
+            display: none;
+        }
+        
+        /* Reset básico */
+        * {
+            box-sizing: border-box;
+        }
+        
+        body, html {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            overflow: hidden;
+        }
+        
+        /* Scrollbar personalizada para WebKit */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            ::-webkit-scrollbar-track {
+                background: #374151;
+            }
+            
+            ::-webkit-scrollbar-thumb {
+                background: #6b7280;
+            }
+            
+            ::-webkit-scrollbar-thumb:hover {
+                background: #9ca3af;
+            }
+        }
+        
+        /* Seleção de texto */
+        ::selection {
+            background-color: #dbeafe;
+            color: #1e40af;
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            ::selection {
+                background-color: #1e3a8a;
+                color: #dbeafe;
+            }
+        }
+        
+        /* Focus outline personalizado */
+        :focus {
+            outline: 2px solid #3b82f6;
+            outline-offset: 2px;
+        }
+        
+        /* Disable text selection em elementos de UI */
+        .no-select {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Container principal do React -->
+    <div id="root">
+        <!-- Loading inicial enquanto o React carrega -->
+        <div class="initial-loading">
+            <div>
+                <div class="loading-spinner"></div>
+                <div class="loading-text">Carregando Bíblia Sagrada...</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Script para detectar quando o app carregou -->
+    <script>
+        // Adicionar classe quando o React terminar de carregar
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(function() {
+                document.body.classList.add('app-loaded');
+            }, 100);
+        });
+        
+        // Tratamento de erros globais
+        window.addEventListener('error', function(event) {
+            console.error('Erro JavaScript:', event.error);
+        });
+        
+        window.addEventListener('unhandledrejection', function(event) {
+            console.error('Promise rejeitada:', event.reason);
+        });
+        
+        // Logs de inicialização
+        console.log('Bíblia Sagrada - Carregando aplicativo...');
+        console.log('User Agent:', navigator.userAgent);
+        console.log('Idioma:', navigator.language);
+        
+        // Verificar se está rodando no Electron
+        if (typeof window !== 'undefined' && window.process && window.process.type) {
+            console.log('Executando no Electron');
+        } else {
+            console.log('Executando no navegador');
+        }
+        
+        // Prevenir comportamentos padrão
+        document.addEventListener('dragover', function(e) {
+            e.preventDefault();
+        });
+        
+        document.addEventListener('drop', function(e) {
+            e.preventDefault();
+        });
+        
+        // Atalhos de teclado globais
+        document.addEventListener('keydown', function(e) {
+            // Prevenir F5 e Ctrl+R em produção
+            if ((e.key === 'F5' || (e.ctrlKey && e.key === 'r')) && process.env.NODE_ENV === 'production') {
+                e.preventDefault();
+            }
+            
+            // Prevenir abrir DevTools em produção
+            if (e.key === 'F12' && process.env.NODE_ENV === 'production') {
+                e.preventDefault();
+            }
+            
+            // Prevenir Ctrl+Shift+I em produção
+            if (e.ctrlKey && e.shiftKey && e.key === 'I' && process.env.NODE_ENV === 'production') {
+                e.preventDefault();
+            }
+        });
+        
+        // Detectar tema do sistema
+        if (window.matchMedia) {
+            const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+            
+            function updateTheme(e) {
+                if (e.matches) {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            }
+            
+            // Aplicar tema inicial
+            updateTheme(darkModeQuery);
+            
+            // Escutar mudanças no tema do sistema
+            darkModeQuery.addListener(updateTheme);
+        }
+    </script>
+    
+    <!-- Script principal do React -->
+    <script type="module" src="/src/renderer.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,319 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
+  }
+ 
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 94.1%;
+  }
+
+  body {
+    @apply bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100;
+  }
+  
+  html {
+    @apply antialiased;
+  }
+}
+
+  /* Scrollbar personalizada */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-muted;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/30 rounded-md;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/50;
+  }
+
+  /* Firefox scrollbar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) hsl(var(--muted));
+  }
+
+  /* Seleção de texto */
+  ::selection {
+    @apply bg-primary/20;
+  }
+
+  /* Foco acessível */
+  .focus-visible:focus-visible {
+    @apply outline-none ring-2 ring-blue-500 ring-offset-2 ring-offset-white dark:ring-offset-gray-900;
+  }
+
+  /* Classes utilitárias personalizadas */
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Animações personalizadas */
+  @keyframes pulse-subtle {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.8;
+    }
+  }
+
+  .animate-pulse-subtle {
+    animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* Estilos para versículos */
+  .versiculo-numero {
+    @apply inline-flex items-center justify-center w-6 h-6 bg-primary/10 text-primary rounded-full text-xs font-semibold mr-2 flex-shrink-0;
+  }
+
+  .versiculo-texto {
+    @apply text-base leading-relaxed;
+  }
+
+  .versiculo-destaque {
+    @apply bg-yellow-200 dark:bg-yellow-800 px-1 rounded;
+  }
+
+  /* Estilos para cards de navegação */
+  .nav-card {
+    @apply p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-all duration-200 cursor-pointer;
+  }
+
+  .nav-card:hover {
+    @apply border-primary/50 shadow-lg;
+  }
+
+  /* Estilos para botões de ação flutuante */
+  .fab {
+    @apply fixed bottom-6 right-6 w-14 h-14 bg-primary text-primary-foreground rounded-full shadow-lg flex items-center justify-center z-50 hover:shadow-xl transition-all duration-200;
+  }
+
+  /* Estilos para notificações toast */
+  .toast {
+    @apply bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 rounded-lg shadow-lg p-4 min-w-80;
+  }
+
+  .toast-success {
+    @apply border-green-500 bg-green-50 dark:bg-green-950;
+  }
+
+  .toast-error {
+    @apply border-red-500 bg-red-50 dark:bg-red-950;
+  }
+
+  .toast-warning {
+    @apply border-yellow-500 bg-yellow-50 dark:bg-yellow-950;
+  }
+
+  /* Estilos para skeleton loading */
+  .skeleton {
+    @apply animate-pulse bg-muted rounded;
+  }
+
+  /* Estilos para highlight de busca */
+  mark {
+    @apply bg-yellow-200 dark:bg-yellow-800 px-1 rounded text-gray-900 dark:text-gray-100;
+  }
+
+  /* Estilos para formulários */
+  .form-group {
+    @apply space-y-2;
+  }
+
+  .form-label {
+    @apply text-sm font-medium text-gray-900 dark:text-gray-100;
+  }
+
+  .form-error {
+    @apply text-sm text-red-500 dark:text-red-400;
+  }
+
+  /* Estilos para tabelas */
+  .table {
+    @apply w-full border-collapse border-spacing-0;
+  }
+
+  .table th {
+    @apply border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 p-2 text-left text-sm font-medium text-gray-600 dark:text-gray-400;
+  }
+
+  .table td {
+    @apply border-b border-gray-200 dark:border-gray-700 p-2 text-sm;
+  }
+
+  /* Estilos para divisores */
+  .divider {
+    @apply border-t border-gray-200 dark:border-gray-700 my-4;
+  }
+
+  .divider-text {
+    @apply flex items-center justify-center relative my-4;
+  }
+
+  .divider-text::before {
+    @apply content-[''] absolute inset-0 flex items-center;
+  }
+
+  .divider-text::before {
+    @apply border-t border-gray-200 dark:border-gray-700 w-full;
+  }
+
+  .divider-text span {
+    @apply bg-white dark:bg-gray-900 px-3 text-sm text-gray-600 dark:text-gray-400;
+  }
+
+  /* Estilos para badges */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-primary {
+    @apply bg-primary/10 text-primary;
+  }
+
+  .badge-secondary {
+    @apply bg-secondary text-secondary-foreground;
+  }
+
+  .badge-outline {
+    @apply border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100;
+  }
+
+  /* Responsividade aprimorada */
+  @media (max-width: 640px) {
+    .container {
+      @apply px-4;
+    }
+    
+    .fab {
+      @apply bottom-4 right-4 w-12 h-12;
+    }
+  }
+
+  /* Estados de interação melhorados */
+  .interactive {
+    @apply transition-all duration-200 ease-in-out;
+  }
+
+  .interactive:hover {
+    @apply scale-[1.02] shadow-md;
+  }
+
+  .interactive:active {
+    @apply scale-[0.98];
+  }
+
+  /* Estilos para modo de leitura */
+  .reading-mode {
+    @apply max-w-4xl mx-auto px-6;
+  }
+
+  .reading-mode .versiculo-texto {
+    @apply text-lg leading-8;
+  }
+
+  /* Estilos para impressão */
+  @media print {
+    .no-print {
+      @apply hidden;
+    }
+    
+    .print-only {
+      @apply block;
+    }
+    
+    body {
+      @apply text-black bg-white;
+    }
+    
+    .versiculo-numero {
+      @apply bg-gray-100 text-black;
+    }
+  }
+
+/* Variáveis CSS customizadas para tamanhos de fonte */
+:root {
+  --font-size-small: 0.875rem;
+  --font-size-medium: 1rem;
+  --font-size-large: 1.125rem;
+  --font-size-extra-large: 1.25rem;
+}
+
+.font-size-small {
+  font-size: var(--font-size-small);
+}
+
+.font-size-medium {
+  font-size: var(--font-size-medium);
+}
+
+.font-size-large {
+  font-size: var(--font-size-large);
+}
+
+.font-size-extra-large {
+  font-size: var(--font-size-extra-large);
+}
