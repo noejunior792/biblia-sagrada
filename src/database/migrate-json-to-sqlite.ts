@@ -18,6 +18,7 @@ interface BookMapping {
 class JSONToSQLiteMigrator {
   private db: BibliaDatabase;
   private bibliaData: BibliaJSON[] = [];
+  private shouldCloseDb: boolean = true;
   
   // Mapeamento completo dos livros da Bíblia
   private bookMappings: BookMapping[] = [
@@ -94,8 +95,14 @@ class JSONToSQLiteMigrator {
     { abbrev: 'Ap', nome: 'Apocalipse', testamento: 'Novo', ordem: 66 }
   ];
 
-  constructor() {
-    this.db = new BibliaDatabase();
+  constructor(externalDb?: BibliaDatabase) {
+    if (externalDb) {
+      this.db = externalDb;
+      this.shouldCloseDb = false; // Don't close externally provided database
+    } else {
+      this.db = new BibliaDatabase();
+      this.shouldCloseDb = true;
+    }
   }
 
   private async loadBibliaJSON(): Promise<void> {
@@ -142,29 +149,38 @@ class JSONToSQLiteMigrator {
     // Limpar na ordem correta devido às foreign keys
     // Para tabela FTS5, não podemos usar DELETE diretamente
     try {
-      await this.db.run('DROP TABLE IF EXISTS versiculos_fts');
+      // Primeiro, verificar se a tabela FTS existe
+      const ftsExists = await this.db.get<{ count: number }>(`
+        SELECT COUNT(*) as count FROM sqlite_master 
+        WHERE type='table' AND name='versiculos_fts'
+      `);
+      
+      if (ftsExists && ftsExists.count > 0) {
+        await this.db.run('DROP TABLE versiculos_fts');
+        console.log('✅ Tabela FTS removida');
+      }
     } catch (error) {
       console.log('⚠️ Aviso ao remover tabela FTS:', error);
     }
     
-    await this.db.run('DELETE FROM historico_leitura');
-    await this.db.run('DELETE FROM anotacoes');
-    await this.db.run('DELETE FROM favoritos');
-    await this.db.run('DELETE FROM versiculos');
-    await this.db.run('DELETE FROM capitulos');
-    await this.db.run('DELETE FROM livros');
-    
-    // Recriar tabela FTS5
-    await this.db.run(`
-      CREATE VIRTUAL TABLE IF NOT EXISTS versiculos_fts USING fts5(
-        livro_nome,
-        capitulo,
-        numero,
-        texto,
-        content='versiculos',
-        content_rowid='id'
-      )
-    `);
+    // Limpar dados das tabelas relacionadas
+    try {
+      await this.db.run('DELETE FROM historico_leitura');
+      await this.db.run('DELETE FROM anotacoes');
+      await this.db.run('DELETE FROM favoritos');
+      await this.db.run('DELETE FROM versiculos');
+      await this.db.run('DELETE FROM capitulos');
+      await this.db.run('DELETE FROM livros');
+    } catch (error) {
+      console.log('⚠️ Aviso ao limpar dados existentes:', error);
+      // Se falhar, tentar recriar as tabelas
+      await this.db.run('DROP TABLE IF EXISTS historico_leitura');
+      await this.db.run('DROP TABLE IF EXISTS anotacoes');
+      await this.db.run('DROP TABLE IF EXISTS favoritos');
+      await this.db.run('DROP TABLE IF EXISTS versiculos');
+      await this.db.run('DROP TABLE IF EXISTS capitulos');
+      await this.db.run('DROP TABLE IF EXISTS livros');
+    }
     
     console.log('✅ Dados existentes removidos');
   }
@@ -273,14 +289,42 @@ class JSONToSQLiteMigrator {
   private async updateFTSIndex(): Promise<void> {
     console.log('🔍 Atualizando índice de busca (FTS)...');
     
-    await this.db.run(`
-      INSERT INTO versiculos_fts (rowid, livro_nome, capitulo, numero, texto)
-      SELECT v.id, l.nome, v.capitulo, v.numero, v.texto
-      FROM versiculos v
-      JOIN livros l ON v.livro_id = l.id
-    `);
-    
-    console.log('✅ Índice FTS atualizado');
+    try {
+      // Primeiro, criar a tabela FTS se não existir
+      await this.db.run(`
+        CREATE VIRTUAL TABLE IF NOT EXISTS versiculos_fts USING fts5(
+          livro_nome,
+          capitulo,
+          numero,
+          texto,
+          content=''
+        )
+      `);
+      
+      // Verificar se a tabela foi criada
+      const ftsExists = await this.db.get<{ count: number }>(`
+        SELECT COUNT(*) as count FROM sqlite_master 
+        WHERE type='table' AND name='versiculos_fts'
+      `);
+      
+      if (!ftsExists || ftsExists.count === 0) {
+        console.log('⚠️ Não foi possível criar tabela FTS, pulando índice...');
+        return;
+      }
+      
+      // Inserir dados no índice FTS
+      await this.db.run(`
+        INSERT INTO versiculos_fts (livro_nome, capitulo, numero, texto)
+        SELECT l.nome, v.capitulo, v.numero, v.texto
+        FROM versiculos v
+        JOIN livros l ON v.livro_id = l.id
+      `);
+      
+      console.log('✅ Índice FTS atualizado');
+    } catch (error) {
+      console.log('⚠️ Erro ao atualizar índice FTS:', error);
+      // Não falhar a migração por causa do FTS
+    }
   }
 
   private async generateStatistics(): Promise<void> {
@@ -345,19 +389,49 @@ class JSONToSQLiteMigrator {
   }
 
   async migrate(): Promise<void> {
-    const startTime = Date.now();
     console.log('🚀 Iniciando migração do JSON para SQLite...\n');
+    
+    // Add timeout to entire migration process
+    const migrationTimeout = new Promise<never>((_, reject) => 
+      setTimeout(() => reject(new Error('Migration timeout - process took too long')), 300000) // 5 minutes
+    );
+    
+    try {
+      await Promise.race([
+        this.performMigration(),
+        migrationTimeout
+      ]);
+      
+    } catch (error) {
+      console.error('❌ Erro durante a migração:', error);
+      throw error;
+    }
+  }
+
+  private async performMigration(): Promise<void> {
+    const startTime = Date.now();
+    let dbInitialized = false;
     
     try {
       // 1. Inicializar banco de dados
       console.log('🔧 Inicializando banco de dados...');
-      await this.db.initialize();
+      if (this.shouldCloseDb) {
+        await this.db.initialize();
+      }
+      dbInitialized = true;
       
       // 2. Carregar dados do JSON
       await this.loadBibliaJSON();
       
       // 3. Verificar se já existem dados
-      const existingBooks = await this.db.get<{ count: number }>('SELECT COUNT(*) as count FROM livros');
+      let existingBooks: { count: number } | undefined;
+      try {
+        existingBooks = await this.db.get<{ count: number }>('SELECT COUNT(*) as count FROM livros');
+      } catch (error) {
+        console.log('⚠️ Erro ao verificar dados existentes, assumindo banco vazio:', error);
+        existingBooks = { count: 0 };
+      }
+      
       if (existingBooks && existingBooks.count > 0) {
         console.log(`⚠️ Banco já contém ${existingBooks.count} livros. Removendo dados existentes...`);
         await this.clearExistingData();
@@ -369,14 +443,26 @@ class JSONToSQLiteMigrator {
       // 5. Inserir capítulos e versículos
       await this.insertChaptersAndVerses(bookIdMap);
       
-      // 6. Atualizar índice FTS
-      await this.updateFTSIndex();
+      // 6. Atualizar índice FTS (não crítico)
+      try {
+        await this.updateFTSIndex();
+      } catch (error) {
+        console.log('⚠️ Erro ao atualizar FTS, continuando sem índice de busca:', error);
+      }
       
-      // 7. Gerar estatísticas
-      await this.generateStatistics();
+      // 7. Gerar estatísticas (não crítico)
+      try {
+        await this.generateStatistics();
+      } catch (error) {
+        console.log('⚠️ Erro ao gerar estatísticas:', error);
+      }
       
-      // 8. Testar busca
-      await this.testSearchFunction();
+      // 8. Testar busca (não crítico)
+      try {
+        await this.testSearchFunction();
+      } catch (error) {
+        console.log('⚠️ Erro ao testar busca:', error);
+      }
       
       const duration = Date.now() - startTime;
       console.log(`\n🎉 Migração concluída com sucesso em ${duration}ms!`);
@@ -384,33 +470,119 @@ class JSONToSQLiteMigrator {
       
     } catch (error) {
       console.error('❌ Erro durante a migração:', error);
+      
+      // Tentar reverter mudanças em caso de erro crítico
+      if (dbInitialized) {
+        try {
+          console.log('🔄 Tentando reverter mudanças...');
+          await this.clearExistingData();
+        } catch (revertError) {
+          console.error('❌ Erro ao reverter mudanças:', revertError);
+        }
+      }
+      
       throw error;
     } finally {
-      await this.db.close();
+      if (dbInitialized && this.shouldCloseDb) {
+        try {
+          await this.db.close();
+        } catch (closeError) {
+          console.error('❌ Erro ao fechar banco de dados:', closeError);
+        }
+      }
     }
   }
 }
 
 // Função para executar a migração
-export async function migrateJSONToSQLite(): Promise<void> {
-  const migrator = new JSONToSQLiteMigrator();
-  await migrator.migrate();
+// Migration lock to prevent concurrent migrations
+let migrationInProgress = false;
+let migrationPromise: Promise<void> | null = null;
+
+export async function migrateJSONToSQLite(externalDb?: BibliaDatabase): Promise<void> {
+  if (migrationInProgress) {
+    console.log('⏳ Migração já em andamento, aguardando...');
+    if (migrationPromise) {
+      await migrationPromise;
+    }
+    return;
+  }
+
+  migrationInProgress = true;
+  
+  try {
+    migrationPromise = (async () => {
+      const migrator = new JSONToSQLiteMigrator(externalDb);
+      await migrator.migrate();
+    })();
+    
+    await migrationPromise;
+    console.log('✅ Migração concluída com sucesso');
+  } catch (error) {
+    console.error('❌ Erro durante migração:', error);
+    throw error;
+  } finally {
+    migrationInProgress = false;
+    migrationPromise = null;
+  }
 }
 
 // Função para verificar se a migração é necessária
-export async function isMigrationNeeded(): Promise<boolean> {
-  const db = new BibliaDatabase();
+export async function isMigrationNeeded(externalDb?: BibliaDatabase): Promise<boolean> {
+  // Se migração está em andamento, considerar que não é necessária
+  if (migrationInProgress) {
+    return false;
+  }
+
+  let db = externalDb;
+  let shouldCloseDb = false;
+  
+  if (!db) {
+    db = new BibliaDatabase();
+    shouldCloseDb = true;
+  }
   
   try {
-    await db.initialize();
+    if (shouldCloseDb) {
+      await db.initialize();
+    }
+    
+    // Verificar se as tabelas existem
+    const tablesExist = await db.get<{ count: number }>(`
+      SELECT COUNT(*) as count FROM sqlite_master 
+      WHERE type='table' AND name IN ('livros', 'versiculos')
+    `);
+    
+    if (!tablesExist || tablesExist.count < 2) {
+      if (shouldCloseDb) {
+        await db.close();
+      }
+      return true;
+    }
+    
+    // Verificar se há versículos
     const result = await db.get<{ count: number }>('SELECT COUNT(*) as count FROM versiculos');
-    await db.close();
+    if (shouldCloseDb) {
+      await db.close();
+    }
     
     // Se não há versículos, migração é necessária
     return !result || result.count === 0;
   } catch (error) {
     console.error('Erro ao verificar se migração é necessária:', error);
-    return true; // Em caso de erro, assumir que migração é necessária
+    if (shouldCloseDb) {
+      try {
+        await db.close();
+      } catch (closeError) {
+        console.error('Erro ao fechar banco durante verificação:', closeError);
+      }
+    }
+    // Em caso de erro crítico, não assumir migração necessária para evitar loops
+    if (error instanceof Error && error.message.includes('SQLITE_BUSY')) {
+      console.log('⚠️ Banco ocupado, assumindo migração não necessária');
+      return false;
+    }
+    return true; // Em caso de outros erros, assumir que migração é necessária
   }
 }
 

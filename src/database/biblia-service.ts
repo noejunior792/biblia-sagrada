@@ -19,6 +19,7 @@ export class HybridBibliaService {
   private jsonService: JSONBibliaService | null = null;
   private useSQLite = false;
   private initialized = false;
+  private initializing = false;
 
   constructor() {
     this.db = getDatabase();
@@ -26,40 +27,110 @@ export class HybridBibliaService {
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
+    if (this.initializing) {
+      // Wait for existing initialization to complete
+      let waitCount = 0;
+      while (this.initializing && !this.initialized && waitCount < 300) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        waitCount++;
+      }
+      if (waitCount >= 300) {
+        console.error('⏰ Timeout aguardando inicialização, forçando fallback para JSON');
+        this.useSQLite = false;
+        this.jsonService = new JSONBibliaService();
+        this.initialized = true;
+      }
+      return;
+    }
+
+    this.initializing = true;
 
     try {
       console.log('🚀 Inicializando serviço híbrido da Bíblia...');
       
-      // Inicializar banco SQLite
-      await this.db.initialize();
+      // Tentar inicializar SQLite com timeout mais curto
+      const initTimeout = new Promise<void>((_, reject) => 
+        setTimeout(() => reject(new Error('Database initialization timeout')), 15000)
+      );
+      
+      try {
+        await Promise.race([this.db.initialize(), initTimeout]);
+        console.log('✅ Banco SQLite inicializado');
+      } catch (dbError) {
+        console.error('❌ Falha ao inicializar SQLite:', dbError);
+        throw new Error('SQLite_INIT_FAILED');
+      }
       
       // Verificar se migração é necessária
-      const needsMigration = await isMigrationNeeded();
+      let needsMigration = false;
+      try {
+        needsMigration = await isMigrationNeeded(this.db);
+      } catch (migrationCheckError) {
+        console.error('❌ Erro ao verificar migração:', migrationCheckError);
+        // Se não conseguir verificar, assumir que precisa de migração
+        needsMigration = true;
+      }
       
       if (needsMigration) {
         console.log('📦 Migração necessária. Executando migração do JSON para SQLite...');
-        await migrateJSONToSQLite();
-        this.useSQLite = true;
-        console.log('✅ Migração concluída. Usando SQLite.');
+        console.log('🔧 Estado antes da migração: DB inicializado, usando instância existente');
+        try {
+          // Pass the existing database connection to migration to prevent closing it
+          console.log('⏳ Iniciando processo de migração...');
+          await migrateJSONToSQLite(this.db);
+          console.log('✅ Migração do JSON para SQLite concluída com sucesso');
+          this.useSQLite = true;
+          console.log('✅ Serviço configurado para usar SQLite');
+          
+          // Verify database is still functional after migration
+          console.log('🔍 Verificando funcionalidade do banco após migração...');
+          const testQuery = await this.db.get<{ count: number }>('SELECT COUNT(*) as count FROM livros');
+          console.log(`✅ Verificação pós-migração: ${testQuery?.count || 0} livros encontrados`);
+          
+        } catch (migrationError) {
+          console.error('❌ Erro na migração, usando fallback JSON:', migrationError);
+          console.error('📊 Stack trace da migração:', migrationError instanceof Error ? migrationError.stack : 'N/A');
+          throw new Error('MIGRATION_FAILED');
+        }
       } else {
         console.log('✅ Dados SQLite já disponíveis. Usando SQLite.');
         this.useSQLite = true;
       }
 
-      // Fallback para JSON se SQLite falhar
-      if (!this.useSQLite) {
-        console.log('⚠️ Fallback para serviço JSON...');
-        this.jsonService = new JSONBibliaService();
-      }
-
       this.initialized = true;
-      console.log(`✅ Serviço inicializado usando: ${this.useSQLite ? 'SQLite' : 'JSON'}`);
+      console.log('✅ Serviço híbrido inicializado com SQLite');
+      console.log('📋 Estado final: SQLite ativo, serviço pronto para uso');
       
     } catch (error) {
       console.error('❌ Erro ao inicializar serviço SQLite, usando fallback JSON:', error);
+      console.error('📊 Detalhes do erro de inicialização:', error instanceof Error ? error.message : String(error));
+      
+      // Tentar fechar conexão SQLite em caso de erro (mas não fechar se foi passada externamente)
+      try {
+        // Only close if we created the connection ourselves
+        console.log('🔧 Tentando limpar conexão SQLite...');
+        await this.db.close();
+        console.log('✅ Conexão SQLite fechada durante fallback');
+      } catch (closeError) {
+        console.error('⚠️ Erro ao fechar banco durante fallback:', closeError);
+      }
+      
+      // Fallback para JSON
+      console.log('🔄 Iniciando fallback para serviço JSON...');
       this.useSQLite = false;
-      this.jsonService = new JSONBibliaService();
+      try {
+        this.jsonService = new JSONBibliaService();
+        console.log('✅ Serviço JSON inicializado como fallback');
+        console.log('📋 Estado fallback: SQLite desabilitado, JSON ativo');
+      } catch (jsonError) {
+        console.error('❌ Erro crítico: não foi possível inicializar nem SQLite nem JSON:', jsonError);
+        console.error('💥 Sistema será inicializado em estado limitado');
+        // Mesmo assim, marcar como inicializado para evitar loops infinitos
+      }
       this.initialized = true;
+    } finally {
+      this.initializing = false;
+      console.log('🏁 Processo de inicialização finalizado');
     }
   }
 
@@ -673,21 +744,22 @@ export const initBibliaService = async (): Promise<HybridBibliaService> => {
         const service = getBibliaService();
         await service.initialize();
         console.log('✅ Serviço híbrido da Bíblia inicializado');
-        return service;
       } catch (error) {
         console.error('❌ Erro ao inicializar serviço da Bíblia:', error);
-        throw error;
+        // Reset promise para permitir retry
+        initPromise = null;
+        // Don't throw, just use service with JSON fallback
+        const service = getBibliaService();
+        // Force initialization of JSON service as fallback
+        try {
+          await service.initialize();
+        } catch (fallbackError) {
+          console.error('❌ Erro no fallback:', fallbackError);
+        }
       }
     })();
   }
   
-  try {
-    await initPromise;
-    return getBibliaService();
-  } catch (error) {
-    console.error('❌ Falha na inicialização do serviço:', error);
-    // Reset the promise so it can be retried
-    initPromise = null;
-    throw error;
-  }
+  await initPromise;
+  return getBibliaService();
 };

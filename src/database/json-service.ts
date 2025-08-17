@@ -61,16 +61,20 @@ export class JSONBibliaService {
         assetsPath = path.join(process.resourcesPath, 'assets', 'KJA.json');
       }
       
-      console.log('Tentando carregar dados da Bíblia de:', assetsPath);
+      console.log('📖 Carregando dados da Bíblia de:', assetsPath);
       
       if (!fs.existsSync(assetsPath)) {
         throw new Error(`Arquivo KJA.json não encontrado em: ${assetsPath}`);
       }
       
       const data = fs.readFileSync(assetsPath, 'utf-8');
-      this.bibliaData = JSON.parse(data);
+      const jsonData = JSON.parse(data);
+      console.log('📖 Estrutura JSON:', Array.isArray(jsonData) ? 'Array' : 'Object');
+      console.log('📖 Total de elementos:', Array.isArray(jsonData) ? jsonData.length : Object.keys(jsonData).length);
+      
+      this.bibliaData = jsonData;
       this.processLivros();
-      console.log('Dados da Bíblia carregados com sucesso!');
+      console.log('✅ Dados da Bíblia carregados com sucesso!');
     } catch (error) {
       console.error('Erro ao carregar dados da Bíblia:', error);
       throw error;
@@ -80,36 +84,73 @@ export class JSONBibliaService {
   private processLivros() {
     if (!this.bibliaData) return;
 
+    console.log('📚 JSONService: Processando livros...');
+    
+    // Verificar se é array ou objeto
+    const isArray = Array.isArray(this.bibliaData);
+    console.log('📚 JSONService: Dados são array?', isArray);
+
     const livrosAT = [
-      'genesis', 'exodus', 'leviticus', 'numbers', 'deuteronomy', 'joshua', 'judges', 'ruth',
-      '1samuel', '2samuel', '1kings', '2kings', '1chronicles', '2chronicles', 'ezra', 'nehemiah',
-      'esther', 'job', 'psalms', 'proverbs', 'ecclesiastes', 'song', 'isaiah', 'jeremiah',
-      'lamentations', 'ezekiel', 'daniel', 'hosea', 'joel', 'amos', 'obadiah', 'jonah',
-      'micah', 'nahum', 'habakkuk', 'zephaniah', 'haggai', 'zechariah', 'malachi'
+      'gn', 'ex', 'lv', 'nm', 'dt', 'js', 'jz', 'rt', '1sm', '2sm', '1rs', '2rs', 
+      '1cr', '2cr', 'ed', 'ne', 'et', 'jó', 'sl', 'pv', 'ec', 'ct', 'is', 'jr', 
+      'lm', 'ez', 'dn', 'os', 'jl', 'am', 'ob', 'jn', 'mq', 'na', 'hc', 'sf', 
+      'ag', 'zc', 'ml'
     ];
 
     let ordem = 1;
     this.livros = [];
 
-    if (!this.bibliaData) {
-      console.error('Dados da Bíblia não carregados');
-      return;
+    if (isArray) {
+      // Processar como array
+      this.bibliaData.forEach((bookData: any, index: number) => {
+        if (!bookData || !bookData.abbrev || !bookData.name || !bookData.chapters) {
+          console.warn('📚 JSONService: Dados do livro inválidos no índice:', index);
+          return;
+        }
+
+        const isAT = livrosAT.includes(bookData.abbrev.toLowerCase());
+        
+        console.log('📚 JSONService: Processando livro:', {
+          index,
+          nome: bookData.name,
+          abreviacao: bookData.abbrev,
+          testamento: isAT ? 'Antigo' : 'Novo',
+          capitulos: bookData.chapters?.length
+        });
+        
+        this.livros.push({
+          id: index + 1,
+          nome: bookData.name,
+          abreviacao: bookData.abbrev,
+          testamento: isAT ? 'Antigo' : 'Novo',
+          ordem: ordem++,
+          capitulos_total: bookData.chapters.length
+        });
+      });
+    } else {
+      // Processar como objeto (código anterior)
+      Object.keys(this.bibliaData).forEach((key, index) => {
+        const bookData = this.bibliaData?.[key];
+        if (!bookData) {
+          console.warn('📚 JSONService: Dados do livro não encontrados para chave:', key);
+          return;
+        }
+        const isAT = livrosAT.includes(key.toLowerCase());
+        
+        this.livros.push({
+          id: index + 1,
+          nome: bookData.name,
+          abreviacao: bookData.abbrev,
+          testamento: isAT ? 'Antigo' : 'Novo',
+          ordem: ordem++,
+          capitulos_total: bookData.chapters.length
+        });
+      });
     }
 
-    Object.keys(this.bibliaData).forEach((key, index) => {
-      const bookData = this.bibliaData?.[key];
-      if (!bookData) return;
-      const isAT = livrosAT.includes(key.toLowerCase());
-      
-      this.livros.push({
-        id: index + 1,
-        nome: bookData.name,
-        abreviacao: bookData.abbrev,
-        testamento: isAT ? 'Antigo' : 'Novo',
-        ordem: ordem++,
-        capitulos_total: bookData.chapters.length
-      });
-    });
+    console.log('📚 JSONService: Total de livros processados:', this.livros.length);
+    console.log('📚 JSONService: Livros AT:', this.livros.filter(l => l.testamento === 'Antigo').length);
+    console.log('📚 JSONService: Livros NT:', this.livros.filter(l => l.testamento === 'Novo').length);
   }
 
   private loadLocalData() {
@@ -203,12 +244,19 @@ export class JSONBibliaService {
   // Versículos
   async getVersiculosCapitulo(livroId: number, capitulo: number): Promise<DatabaseResponse<Versiculo[]>> {
     try {
+      console.log('📖 JSONService: getVersiculosCapitulo chamado com:', { livroId, capitulo });
+      console.log('📖 JSONService: bibliaData disponível?', !!this.bibliaData);
+      console.log('📖 JSONService: livros carregados:', this.livros.length);
+      
       if (!this.bibliaData) {
+        console.error('📖 JSONService: Dados da Bíblia não carregados');
         return { success: false, error: 'Dados da Bíblia não carregados' };
       }
 
       const livro = this.livros.find(l => l.id === livroId);
+      console.log('📖 JSONService: Livro encontrado:', livro?.nome);
       if (!livro) {
+        console.error('📖 JSONService: Livro não encontrado para ID:', livroId);
         return { success: false, error: 'Livro não encontrado' };
       }
 
@@ -217,20 +265,40 @@ export class JSONBibliaService {
         return { success: false, error: 'Dados da Bíblia não carregados' };
       }
 
-      const bookKey = Object.keys(this.bibliaData).find(key => 
-        this.bibliaData?.[key]?.name === livro.nome
-      );
-
-      if (!bookKey || !this.bibliaData[bookKey]) {
-        return { success: false, error: 'Dados do livro não encontrados' };
+      console.log('📖 JSONService: Procurando livro nos dados JSON:', livro.nome);
+      
+      let bookData: any = null;
+      
+      if (Array.isArray(this.bibliaData)) {
+        // Buscar no array
+        bookData = this.bibliaData.find((book: any) => book.name === livro.nome);
+        console.log('📖 JSONService: Livro encontrado no array:', !!bookData);
+      } else {
+        // Buscar no objeto (código anterior)
+        console.log('📖 JSONService: Chaves disponíveis:', Object.keys(this.bibliaData).slice(0, 5));
+        const bookKey = Object.keys(this.bibliaData).find(key => 
+          this.bibliaData?.[key]?.name === livro.nome
+        );
+        console.log('📖 JSONService: Chave do livro encontrada:', bookKey);
+        bookData = bookKey ? this.bibliaData[bookKey] : null;
       }
 
-      const bookData = this.bibliaData[bookKey];
+      if (!bookData) {
+        console.error('📖 JSONService: Dados do livro não encontrados para:', livro.nome);
+        return { success: false, error: 'Dados do livro não encontrados' };
+      }
+      console.log('📖 JSONService: Total de capítulos no livro:', bookData.chapters?.length);
+      console.log('📖 JSONService: Procurando capítulo:', capitulo);
+      
       const capituloData = bookData.chapters[capitulo - 1];
 
       if (!capituloData) {
+        console.error('📖 JSONService: Capítulo não encontrado:', capitulo);
         return { success: false, error: 'Capítulo não encontrado' };
       }
+
+      console.log('📖 JSONService: Versículos no capítulo:', capituloData.length);
+      console.log('📖 JSONService: Primeiro versículo:', capituloData[0]?.substring(0, 50) + '...');
 
       const versiculos: Versiculo[] = capituloData.map((texto, index) => ({
         id: parseInt(this.generateVersiculoId(livroId, capitulo, index + 1)),
@@ -240,8 +308,12 @@ export class JSONBibliaService {
         texto: texto
       }));
 
+      console.log('📖 JSONService: Versículos processados:', versiculos.length);
+      console.log('📖 JSONService: Retornando sucesso com', versiculos.length, 'versículos');
+      
       return { success: true, data: versiculos };
     } catch (error) {
+      console.error('📖 JSONService: Erro ao carregar versículos:', error);
       return { success: false, error: (error as Error).message };
     }
   }

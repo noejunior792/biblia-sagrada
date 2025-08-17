@@ -124,6 +124,27 @@ lint_code() {
     fi
 }
 
+# Limpar banco de dados de desenvolvimento
+clean_db() {
+    log "Limpando banco de dados de desenvolvimento..."
+    
+    # Remover arquivos de banco de dados do diretório do projeto
+    find . -name "biblia.db*" -type f -delete 2>/dev/null || true
+    
+    # Limpar cache do usuário de desenvolvimento
+    if [ -d "$HOME/.config/biblia-sagrada" ]; then
+        warning "Encontrado diretório de dados de desenvolvimento"
+        read -p "Deseja limpar os dados de desenvolvimento? (s/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Ss]$ ]]; then
+            rm -rf "$HOME/.config/biblia-sagrada"
+            success "Dados de desenvolvimento removidos"
+        fi
+    fi
+    
+    success "Limpeza de banco de dados concluída"
+}
+
 # Build do aplicativo
 build_app() {
     log "Construindo aplicativo..."
@@ -188,6 +209,9 @@ cleanup() {
         rm -rf out/ dist/ .vite/
         success "Arquivos temporários removidos"
     fi
+    
+    # Limpar arquivos de banco de dados também
+    clean_db
 }
 
 # Menu de opções
@@ -199,8 +223,9 @@ show_menu() {
     echo "3) Apenas instalar dependências npm"
     echo "4) Apenas build"
     echo "5) Apenas gerar .deb"
-    echo "6) Limpar arquivos temporários"
-    echo "7) Sair"
+    echo "6) Limpar banco de dados"
+    echo "7) Limpar arquivos temporários"
+    echo "8) Sair"
     echo
 }
 
@@ -224,6 +249,7 @@ main() {
                 1)
                     check_nodejs
                     check_dependencies
+                    clean_db
                     install_deps
                     type_check
                     lint_code
@@ -247,9 +273,12 @@ main() {
                     make_deb
                     ;;
                 6)
-                    cleanup
+                    clean_db
                     ;;
                 7)
+                    cleanup
+                    ;;
+                8)
                     log "Saindo..."
                     exit 0
                     ;;
@@ -267,6 +296,7 @@ main() {
             --full)
                 check_nodejs
                 check_dependencies
+                clean_db
                 install_deps
                 type_check
                 lint_code
@@ -284,6 +314,9 @@ main() {
             --deb-only)
                 make_deb
                 ;;
+            --clean-db)
+                clean_db
+                ;;
             --clean)
                 cleanup
                 ;;
@@ -295,6 +328,7 @@ main() {
                 echo "  --deps-only  Apenas verificar e instalar dependências"
                 echo "  --build-only Apenas build"
                 echo "  --deb-only   Apenas gerar .deb"
+                echo "  --clean-db   Limpar banco de dados"
                 echo "  --clean      Limpar arquivos temporários"
                 echo "  --help       Mostrar esta ajuda"
                 echo

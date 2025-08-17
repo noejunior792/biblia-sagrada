@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bookGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B4513;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#A0522D;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="crossGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFD700;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FFA500;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Fundo circular -->
+  <circle cx="256" cy="256" r="240" fill="#2C1810" stroke="#8B4513" stroke-width="8"/>
+  
+  <!-- Livro da Bíblia -->
+  <rect x="120" y="150" width="272" height="220" rx="8" ry="8" fill="url(#bookGradient)" stroke="#654321" stroke-width="3"/>
+  
+  <!-- Lombada do livro -->
+  <rect x="120" y="150" width="30" height="220" rx="8" ry="8" fill="#654321"/>
+  
+  <!-- Páginas internas -->
+  <rect x="150" y="160" width="232" height="200" fill="#FFF8DC" stroke="#E6E6FA" stroke-width="1"/>
+  
+  <!-- Linhas do texto -->
+  <line x1="170" y1="190" x2="350" y2="190" stroke="#8B4513" stroke-width="2" opacity="0.7"/>
+  <line x1="170" y1="210" x2="360" y2="210" stroke="#8B4513" stroke-width="2" opacity="0.7"/>
+  <line x1="170" y1="230" x2="340" y2="230" stroke="#8B4513" stroke-width="2" opacity="0.7"/>
+  <line x1="170" y1="250" x2="355" y2="250" stroke="#8B4513" stroke-width="2" opacity="0.7"/>
+  <line x1="170" y1="270" x2="330" y2="270" stroke="#8B4513" stroke-width="2" opacity="0.7"/>
+  
+  <!-- Cruz dourada -->
+  <rect x="240" y="290" width="32" height="8" rx="4" fill="url(#crossGradient)" stroke="#B8860B" stroke-width="1"/>
+  <rect x="252" y="280" width="8" height="32" rx="4" fill="url(#crossGradient)" stroke="#B8860B" stroke-width="1"/>
+  
+  <!-- Marcador de página -->
+  <rect x="350" y="150" width="8" height="80" fill="#DC143C"/>
+  <polygon points="350,230 358,230 354,240" fill="#DC143C"/>
+  
+  <!-- Título na lombada -->
+  <text x="135" y="260" font-family="serif" font-size="16" font-weight="bold" fill="#FFD700" text-anchor="middle" transform="rotate(-90 135 260)">BÍBLIA</text>
+</svg>
