@@ -34,7 +34,7 @@ function createWindow() {
     autoHideMenuBar: true,
     icon: path.join(process.env.VITE_PUBLIC || '', 'icon.png'),
     webPreferences: {
-      preload: path.join(__dirname, 'preload.mjs'),
+      preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
 
@@ -348,17 +348,40 @@ app.whenReady().then(async () => {
 
 // IPC Handlers para comunicação com o renderer
 async function registerIpcHandlers() {
+  console.log('🔧 Registrando handlers IPC...');
   console.log('Inicializando serviço híbrido da Bíblia...');
   const bibliaService = await initBibliaService();
+  console.log('✅ Serviço da Bíblia inicializado, registrando handlers...');
 
   // Livros
   ipcMain.handle('get-livros', async () => {
     try {
+      console.log('📚 Handler get-livros chamado');
+      console.log('📚 bibliaService disponível?', !!bibliaService);
+      console.log('📚 bibliaService.getLivros é função?', typeof bibliaService.getLivros);
+      
       const result = await bibliaService.getLivros();
-      return result.success ? result.data : { success: false, error: result.error };
+      console.log('📚 Result get-livros completo:', JSON.stringify(result, null, 2));
+      console.log('📚 Result success:', result.success);
+      console.log('📚 Result data length:', result.data?.length);
+      console.log('📚 Result error:', result.error);
+      
+      // Sempre retornar estrutura completa DatabaseResponse
+      if (result.success && result.data) {
+        const response = { success: true, data: result.data };
+        console.log('📚 Retornando resposta de sucesso:', response);
+        return response;
+      } else {
+        const response = { success: false, error: result.error || 'Erro desconhecido', data: null };
+        console.log('📚 Retornando resposta de erro:', response);
+        return response;
+      }
     } catch (error) {
-      console.error('Erro ao buscar livros:', error);
-      return { success: false, error: (error as Error).message };
+      console.error('📚 Erro crítico ao buscar livros:', error);
+      console.error('📚 Stack trace:', error instanceof Error ? error.stack : 'N/A');
+      const response = { success: false, error: (error as Error).message, data: null };
+      console.log('📚 Retornando resposta de exceção:', response);
+      return response;
     }
   });
 
@@ -584,6 +607,8 @@ async function registerIpcHandlers() {
       isMinimized: win?.isMinimized() || false
     };
   });
+
+  console.log('✅ Todos os handlers IPC registrados com sucesso!');
 }
 
 // Cleanup on quit

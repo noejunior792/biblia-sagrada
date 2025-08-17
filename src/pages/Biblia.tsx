@@ -38,11 +38,15 @@ export const Biblia: React.FC = () => {
   } = useNavegacao();
   
   useEffect(() => {
+    console.log('📚 Frontend: useEffect - iniciando carregamento de livros');
+    console.log('📚 Frontend: window.electronAPI disponível?', !!window.electronAPI);
+    console.log('📚 Frontend: Todas as funções da API:', Object.keys(window.electronAPI || {}));
     carregarLivros();
   }, []);
 
   useEffect(() => {
     if (livroAtual) {
+      console.log('📖 Frontend: Livro/capítulo mudou:', livroAtual.nome, capituloAtual);
       carregarVersiculos();
       adicionarAoHistorico();
     }
@@ -50,32 +54,72 @@ export const Biblia: React.FC = () => {
 
   const carregarLivros = async () => {
     try {
+      console.log('📚 Frontend: Chamando window.electronAPI.getLivros()...');
+      console.log('📚 Frontend: window.electronAPI.getLivros é função?', typeof window.electronAPI?.getLivros);
+      
+      if (!window.electronAPI) {
+        console.error('📚 Frontend: window.electronAPI não está disponível!');
+        return;
+      }
+      
+      if (!window.electronAPI.getLivros) {
+        console.error('📚 Frontend: window.electronAPI.getLivros não está disponível!');
+        return;
+      }
+      
+      console.log('📚 Frontend: Fazendo chamada IPC...');
       const result = await window.electronAPI.getLivros();
-      if (result.success && result.data) {
+      console.log('📚 Frontend: Resultado getLivros:', result);
+      
+      if (result && result.success && result.data) {
+        console.log('📚 Frontend: Livros carregados:', result.data.length);
         setLivros(result.data);
         
         // Se não há livro atual, selecionar o primeiro (Gênesis)
         if (!livroAtual && result.data.length > 0) {
+          console.log('📚 Frontend: Definindo livro inicial:', result.data[0].nome);
           setLivroAtual(result.data[0]);
         }
+      } else {
+        console.error('📚 Frontend: Erro no resultado getLivros:', result);
+        console.error('📚 Frontend: result.success:', result?.success);
+        console.error('📚 Frontend: result.data:', result?.data);
+        console.error('📚 Frontend: result.error:', result?.error);
       }
     } catch (error) {
-      console.error('Erro ao carregar livros:', error);
+      console.error('📚 Frontend: Erro ao carregar livros:', error);
+      console.error('📚 Frontend: Stack trace:', error instanceof Error ? error.stack : 'N/A');
+    } finally {
+      setCarregando(false);
     }
   };
 
   const carregarVersiculos = async () => {
-    if (!livroAtual) return;
+    if (!livroAtual) {
+      console.log('📖 Frontend: Não há livro atual, pulando carregamento de versículos');
+      return;
+    }
     
+    console.log('📖 Frontend: Carregando versículos para:', livroAtual.nome, 'cap.', capituloAtual);
     setCarregando(true);
     try {
+      if (!window.electronAPI?.getVersiculosCapitulo) {
+        console.error('📖 Frontend: getVersiculosCapitulo não disponível');
+        return;
+      }
+      
       const result = await window.electronAPI.getVersiculosCapitulo(livroAtual.id, capituloAtual);
-      if (result.success && result.data) {
+      console.log('📖 Frontend: Resultado versículos:', result);
+      
+      if (result && result.success && result.data) {
+        console.log('📖 Frontend: Versículos carregados:', result.data.length);
         setVersiculos(result.data);
         await carregarFavoritos();
+      } else {
+        console.error('📖 Frontend: Erro no resultado versículos:', result);
       }
     } catch (error) {
-      console.error('Erro ao carregar versículos:', error);
+      console.error('📖 Frontend: Erro ao carregar versículos:', error);
     } finally {
       setCarregando(false);
     }
@@ -157,6 +201,54 @@ export const Biblia: React.FC = () => {
           <BookOpen className="h-12 w-12 mx-auto text-gray-600 dark:text-gray-400 mb-4" />
           <h2 className="text-xl font-semibold mb-2">Carregando Bíblia...</h2>
           <p className="text-gray-600 dark:text-gray-400">Por favor, aguarde.</p>
+          <div className="mt-4 text-sm text-gray-500 space-y-2">
+            <p><strong>Estado atual:</strong></p>
+            <p>- Livros carregados: {livros.length}</p>
+            <p>- Carregando: {carregando ? 'Sim' : 'Não'}</p>
+            <p>- electronAPI: {window.electronAPI ? 'Disponível' : 'Indisponível'}</p>
+            <p>- debugInfo: {(window as any).debugInfo ? 'Disponível' : 'Indisponível'}</p>
+            {window.electronAPI && (
+              <p>- Funções API: {Object.keys(window.electronAPI).join(', ')}</p>
+            )}
+            {(window as any).debugInfo && (
+              <div className="text-xs">
+                <p>- Node: {(window as any).debugInfo.versions.node}</p>
+                <p>- Electron: {(window as any).debugInfo.versions.electron}</p>
+                <p>- Context Isolated: {(window as any).debugInfo.contextIsolated ? 'Sim' : 'Não'}</p>
+              </div>
+            )}
+          </div>
+          <div className="mt-4 space-x-2">
+            <button 
+              onClick={() => {
+                console.log('🔄 Frontend: Tentativa manual de carregar livros');
+                carregarLivros();
+              }}
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              Tentar Novamente
+            </button>
+            <button 
+              onClick={async () => {
+                console.log('🧪 Frontend: Testando API básica');
+                if (window.electronAPI?.test) {
+                  try {
+                    const result = await window.electronAPI.test();
+                    console.log('🧪 Frontend: Resultado do teste:', result);
+                    alert(`Teste OK: ${JSON.stringify(result)}`);
+                  } catch (error) {
+                    console.error('🧪 Frontend: Erro no teste:', error);
+                    alert(`Erro no teste: ${error}`);
+                  }
+                } else {
+                  alert('Função test não disponível!');
+                }
+              }}
+              className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+            >
+              Testar API
+            </button>
+          </div>
         </div>
       </div>
     );

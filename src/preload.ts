@@ -11,6 +11,8 @@ import type {
   BuscaParametros 
 } from './types';
 
+console.log('🔧 Preload script carregado');
+
 // Definir tipos para o contexto da API
 export interface ElectronAPI {
   // Livros
@@ -60,17 +62,25 @@ export interface ElectronAPI {
   // Eventos
   onMenuAction: (callback: (action: string) => void) => void;
   removeMenuActionListener: (callback: (action: string) => void) => void;
+
+  // Teste
+  test: () => Promise<{success: boolean, message: string}>;
 }
 
 // API segura exposta ao contexto da janela
 const electronAPI: ElectronAPI = {
   // Livros
-  getLivros: () => ipcRenderer.invoke('get-livros'),
+  getLivros: () => {
+    console.log('📚 getLivros chamado do preload');
+    return ipcRenderer.invoke('get-livros');
+  },
   getLivro: (id: number) => ipcRenderer.invoke('get-livro', id),
   
   // Versículos
-  getVersiculosCapitulo: (livroId: number, capitulo: number) => 
-    ipcRenderer.invoke('get-versiculos-capitulo', livroId, capitulo),
+  getVersiculosCapitulo: (livroId: number, capitulo: number) => {
+    console.log('📖 getVersiculosCapitulo chamado do preload');
+    return ipcRenderer.invoke('get-versiculos-capitulo', livroId, capitulo);
+  },
   getVersiculo: (id: number) => ipcRenderer.invoke('get-versiculo', id),
   
   // Busca
@@ -122,6 +132,12 @@ const electronAPI: ElectronAPI = {
   removeMenuActionListener: (callback: (action: string) => void) => {
     const handler = (_: unknown, action: string) => callback(action);
     ipcRenderer.removeListener('menu-action', handler);
+  },
+
+  // Teste
+  test: () => {
+    console.log('🧪 Função de teste chamada');
+    return Promise.resolve({ success: true, message: 'API funcionando!' });
   }
 };
 
@@ -129,19 +145,33 @@ const electronAPI: ElectronAPI = {
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electronAPI', electronAPI);
-    console.log('API Electron exposta com sucesso');
+    console.log('✅ API Electron exposta com sucesso via contextBridge');
   } catch (error) {
-    console.error('Erro ao expor API Electron:', error);
+    console.error('❌ Erro ao expor API Electron:', error);
   }
 } else {
   // Fallback para quando contextIsolation está desabilitado
+  console.log('⚠️ ContextIsolation desabilitado, usando fallback');
   (window as unknown as { electronAPI: ElectronAPI }).electronAPI = electronAPI;
+}
+
+// Expor versão do processo para debugging
+try {
+  contextBridge.exposeInMainWorld('debugInfo', {
+    versions: process.versions,
+    contextIsolated: process.contextIsolated,
+    nodeEnv: process.env.NODE_ENV
+  });
+  console.log('✅ Debug info exposta');
+} catch (error) {
+  console.error('❌ Erro ao expor debug info:', error);
 }
 
 // Declarar tipos globais para TypeScript
 declare global {
   interface Window {
     electronAPI: ElectronAPI;
+    debugInfo: any;
   }
 }
 
@@ -162,11 +192,47 @@ contextBridge.exposeInMainWorld('versions', {
 });
 
 // Logs de desenvolvimento
-if (process.env.NODE_ENV === 'development') {
-  console.log('Preload script carregado');
-  console.log('Versões:', {
+console.log('📋 Informações do ambiente:', {
+  contextIsolated: process.contextIsolated,
+  nodeEnv: process.env.NODE_ENV,
+  versions: {
     node: process.versions.node,
     chrome: process.versions.chrome,
     electron: process.versions.electron
-  });
+  }
+});
+
+// Testar se a API foi exposta corretamente
+setTimeout(() => {
+  console.log('🔍 Verificando se API foi exposta...');
+  // @ts-ignore
+  if (typeof window !== 'undefined' && window.electronAPI) {
+    console.log('✅ electronAPI disponível no window');
+    // @ts-ignore
+    console.log('📋 Funções disponíveis:', Object.keys(window.electronAPI));
+  } else {
+    console.error('❌ electronAPI NÃO disponível no window');
+  }
+}, 500);
+
+// Teste adicional após DOM carregar
+const domContentLoaded = () => {
+  console.log('🔍 DOM carregado, verificando API novamente...');
+  // @ts-ignore
+  if (typeof window !== 'undefined' && window.electronAPI) {
+    console.log('✅ electronAPI disponível após DOM carregar');
+    // @ts-ignore
+    console.log('📋 Funções disponíveis:', Object.keys(window.electronAPI));
+  } else {
+    console.error('❌ electronAPI NÃO disponível após DOM carregar');
+  }
+};
+
+// Aguardar DOM carregar
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', domContentLoaded);
+  } else {
+    domContentLoaded();
+  }
 }
