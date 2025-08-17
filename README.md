@@ -47,7 +47,7 @@ Um aplicativo completo da Bíblia Sagrada King James em Português, desenvolvido
 
 ## 📋 Pré-requisitos
 
-- Node.js 18+ 
+- Node.js 18+
 - npm ou yarn
 - Git
 
@@ -61,8 +61,8 @@ sudo apt install nodejs npm git build-essential libnss3-dev libatk-bridge2.0-dev
 
 ### 1. Clone o repositório
 ```bash
-git clone https://github.com/bibliasagrada/app.git
-cd app
+git clone https://github.com/noejunior792/biblia-sagrada.git
+cd biblia-sagrada
 ```
 
 ### 2. Instale as dependências
@@ -198,9 +198,9 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICE
 
 ## 📞 Suporte
 
-- **Issues**: [GitHub Issues](https://github.com/bibliasagrada/app/issues)
-- **Discussões**: [GitHub Discussions](https://github.com/bibliasagrada/app/discussions)
-- **Email**: contato@bibliasagrada.com
+- **Issues**: [GitHub Issues](https://github.com/noejunior792/biblia-sagrada/issues)
+- **Discussões**: [GitHub Discussions](https://github.com/noejunior792/biblia-sagrada/discussions)
+- **Email**: bibliasagrada@noejunior.me
 
 ## 🔄 Versões
 
