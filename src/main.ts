@@ -398,11 +398,32 @@ async function registerIpcHandlers() {
   // Versículos
   ipcMain.handle('get-versiculos-capitulo', async (_, livroId: number, capitulo: number) => {
     try {
+      console.log('📖 Handler get-versiculos-capitulo chamado com:', { livroId, capitulo });
+      console.log('📖 bibliaService disponível?', !!bibliaService);
+      console.log('📖 bibliaService.getVersiculosCapitulo é função?', typeof bibliaService.getVersiculosCapitulo);
+      
       const result = await bibliaService.getVersiculosCapitulo(livroId, capitulo);
-      return result.success ? result.data : { success: false, error: result.error };
+      console.log('📖 Result get-versiculos-capitulo completo:', JSON.stringify(result, null, 2));
+      console.log('📖 Result success:', result.success);
+      console.log('📖 Result data length:', result.data?.length);
+      console.log('📖 Result error:', result.error);
+      
+      // Sempre retornar estrutura completa DatabaseResponse
+      if (result.success && result.data) {
+        const response = { success: true, data: result.data };
+        console.log('📖 Retornando resposta de sucesso:', response);
+        return response;
+      } else {
+        const response = { success: false, error: result.error || 'Erro desconhecido ao carregar versículos', data: null };
+        console.log('📖 Retornando resposta de erro:', response);
+        return response;
+      }
     } catch (error) {
-      console.error('Erro ao buscar versículos:', error);
-      return { success: false, error: (error as Error).message };
+      console.error('📖 Erro crítico ao buscar versículos:', error);
+      console.error('📖 Stack trace:', error instanceof Error ? error.stack : 'N/A');
+      const response = { success: false, error: (error as Error).message, data: null };
+      console.log('📖 Retornando resposta de exceção:', response);
+      return response;
     }
   });
 

@@ -106,24 +106,43 @@ export class HybridBibliaService {
 
   // MÉTODOS DE VERSÍCULOS
   async getVersiculosCapitulo(livroId: number, capitulo: number): Promise<DatabaseResponse<Versiculo[]>> {
+    console.log('📖 HybridBibliaService.getVersiculosCapitulo chamado com:', { livroId, capitulo });
     await this.initialize();
+    
+    console.log('📖 Usando SQLite?', this.useSQLite);
+    console.log('📖 DB disponível?', !!this.db);
+    console.log('📖 jsonService disponível?', !!this.jsonService);
     
     if (this.useSQLite) {
       try {
+        console.log('📖 Executando query SQLite...');
         const versiculos = await this.db.all<Versiculo>(
           'SELECT * FROM versiculos WHERE livro_id = ? AND capitulo = ? ORDER BY numero',
           [livroId, capitulo]
         );
+        console.log('📖 Query SQLite executada, resultado:', {
+          count: versiculos.length,
+          firstVerse: versiculos[0]?.texto?.substring(0, 50) + '...' || 'N/A'
+        });
         return { success: true, data: versiculos };
       } catch (error) {
-        console.error('Erro SQLite getVersiculosCapitulo:', error);
+        console.error('📖 Erro SQLite getVersiculosCapitulo:', error);
+        console.error('📖 Stack trace:', error instanceof Error ? error.stack : 'N/A');
         return { success: false, error: (error as Error).message };
       }
     } else {
+      console.log('📖 Usando serviço JSON...');
       if (!this.jsonService) {
+        console.error('📖 Erro: Serviço JSON não inicializado');
         return { success: false, error: 'Serviço JSON não inicializado' };
       }
-      return this.jsonService.getVersiculosCapitulo(livroId, capitulo);
+      const result = await this.jsonService.getVersiculosCapitulo(livroId, capitulo);
+      console.log('📖 Resultado do serviço JSON:', {
+        success: result.success,
+        count: result.data?.length || 0,
+        error: result.error
+      });
+      return result;
     }
   }
 

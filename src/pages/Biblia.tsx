@@ -101,25 +101,36 @@ export const Biblia: React.FC = () => {
     }
     
     console.log('📖 Frontend: Carregando versículos para:', livroAtual.nome, 'cap.', capituloAtual);
+    console.log('📖 Frontend: Parâmetros da chamada:', { livroId: livroAtual.id, capitulo: capituloAtual });
     setCarregando(true);
     try {
       if (!window.electronAPI?.getVersiculosCapitulo) {
         console.error('📖 Frontend: getVersiculosCapitulo não disponível');
+        setCarregando(false);
         return;
       }
       
+      console.log('📖 Frontend: Fazendo chamada IPC getVersiculosCapitulo...');
       const result = await window.electronAPI.getVersiculosCapitulo(livroAtual.id, capituloAtual);
-      console.log('📖 Frontend: Resultado versículos:', result);
+      console.log('📖 Frontend: Resultado versículos completo:', JSON.stringify(result, null, 2));
+      console.log('📖 Frontend: result.success:', result?.success);
+      console.log('📖 Frontend: result.data length:', result?.data?.length);
+      console.log('📖 Frontend: result.error:', result?.error);
       
       if (result && result.success && result.data) {
-        console.log('📖 Frontend: Versículos carregados:', result.data.length);
+        console.log('📖 Frontend: Versículos carregados com sucesso:', result.data.length);
+        console.log('📖 Frontend: Primeiro versículo:', result.data[0]?.texto?.substring(0, 50) + '...');
         setVersiculos(result.data);
         await carregarFavoritos();
       } else {
         console.error('📖 Frontend: Erro no resultado versículos:', result);
+        console.error('📖 Frontend: Definindo array vazio para versículos');
+        setVersiculos([]);
       }
     } catch (error) {
-      console.error('📖 Frontend: Erro ao carregar versículos:', error);
+      console.error('📖 Frontend: Erro crítico ao carregar versículos:', error);
+      console.error('📖 Frontend: Stack trace:', error instanceof Error ? error.stack : 'N/A');
+      setVersiculos([]);
     } finally {
       setCarregando(false);
     }
